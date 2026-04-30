@@ -104,9 +104,9 @@ function Nav() {
           <button className="btn-ghost rounded-full px-4 py-2 text-[13px] text-white/85 hover:text-white">
             Sign in
           </button>
-          <button className="btn-primary rounded-full px-4 py-2 text-[13px] font-medium text-white flex items-center gap-1.5">
+          <a href="/dashboard" className="btn-primary rounded-full px-4 py-2 text-[13px] font-medium text-white flex items-center gap-1.5">
             Launch app <Icon name="arrow-up-right" size={14} />
-          </button>
+          </a>
         </div>
       </div>
     </header>
@@ -158,9 +158,9 @@ function Hero() {
           </p>
 
           <div className="mt-9 flex flex-wrap items-center gap-3">
-            <button className="btn-primary rounded-full px-5 py-3 text-[14px] font-medium text-white flex items-center gap-2">
+            <a href="/dashboard" className="btn-primary rounded-full px-5 py-3 text-[14px] font-medium text-white flex items-center gap-2">
               <Icon name="zap" size={15} /> Launch App
-            </button>
+            </a>
             <button className="btn-ghost rounded-full px-5 py-3 text-[14px] text-white/90 flex items-center gap-2">
               <Icon name="terminal" size={15} /> Build on Drip
             </button>
@@ -893,9 +893,9 @@ function FinalCTA() {
                 Join the public devnet today. Mainnet beta opens Q3 2026 to teams already streaming.
               </p>
               <div className="mt-9 flex items-center justify-center gap-3 flex-wrap">
-                <button className="btn-primary rounded-full px-5 py-3 text-[14px] font-medium text-white flex items-center gap-2">
+                <a href="/dashboard" className="btn-primary rounded-full px-5 py-3 text-[14px] font-medium text-white flex items-center gap-2">
                   <Icon name="zap" size={15} /> Open Drip App
-                </button>
+                </a>
                 <button className="btn-ghost rounded-full px-5 py-3 text-[14px] text-white/90 flex items-center gap-2">
                   <Icon name="book-open" size={15} /> Read the docs
                 </button>
