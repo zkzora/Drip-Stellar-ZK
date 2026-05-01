@@ -26,3 +26,7 @@ function parseProgramId(): PublicKey {
 export const DRIP_PROGRAM_ID: PublicKey = parseProgramId();
 
 export const LAMPORTS_PER_SOL_NUM = 1_000_000_000;
+
+const _rawProgramId = process.env.NEXT_PUBLIC_DRIP_PROGRAM_ID;
+export const DRIP_PROGRAM_ID_CONFIGURED =
+  !!_rawProgramId && _rawProgramId !== "REPLACE_WITH_DEPLOYED_PROGRAM_ID";

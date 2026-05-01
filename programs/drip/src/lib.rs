@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{program::invoke_signed, system_instruction};
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkgPj3GVjKqLx");
+declare_id!("D5u3CiH3drPiQfiXctrFe6yDCsFsqHcWQ5aAnC9pkKM6");
 
 #[program]
 pub mod drip {

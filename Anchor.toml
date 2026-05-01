@@ -1,15 +1,20 @@
+[toolchain]
+
 [features]
-seeds = false
+resolution = true
 skip-lint = false
 
+[programs.devnet]
+drip = "D5u3CiH3drPiQfiXctrFe6yDCsFsqHcWQ5aAnC9pkKM6"
+
 [programs.localnet]
-drip = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkgPj3GVjKqLx"
+drip = "D5u3CiH3drPiQfiXctrFe6yDCsFsqHcWQ5aAnC9pkKM6"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Localnet"
+cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

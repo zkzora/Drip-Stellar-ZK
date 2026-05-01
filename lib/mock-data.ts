@@ -247,14 +247,21 @@ export const FOOTER_LINK_GROUPS = [
   { title: "Company", links: ["Manifesto", "Team", "Press", "Brand kit", "Contact"] },
 ];
 
-export function createSeedStreams(now = Date.now()): MockStream[] {
+export function createSeedStreams(): MockStream[] {
+  // base = already-accumulated amount at a fixed representative snapshot.
+  // started = Date.now() so elapsed ≈ 0 at first render; the live counter ticks
+  // forward from base. Using fixed elapsed constants (not Date.now() arithmetic)
+  // makes base deterministic — identical on SSR and client, eliminating hydration
+  // mismatches from stream-value components.
+  const acc = (b: number, rate: number, elapsedSec: number) => b + rate * elapsedSec;
+  const now = Date.now();
   return [
-    { id: "str_4821", dir: "in", party: "stripe-payroll.sol", addr: "7Hk2...q4Wp", token: "USDC", rate: 0.0125, status: "streaming", started: now - 5 * 86400e3, base: 5400.234, label: "Salary - Stripe Inc", deposit: 12000, totalDuration: 30 * 86400, policy: "standard", category: "HUMAN_PAYROLL" },
-    { id: "str_3902", dir: "in", party: "client.maya.sol", addr: "9Bc1...aL3z", token: "USDC", rate: 0.00231, status: "streaming", started: now - 12 * 3600e3, base: 99.812, label: "Freelance - Component lib", deposit: 800, totalDuration: 14 * 86400, policy: "standard", category: "HUMAN_PAYROLL" },
-    { id: "str_3711", dir: "in", party: "lumen.tv", addr: "F2dN...r88M", token: "USDC", rate: 0.00041, status: "paused", started: now - 2 * 86400e3, base: 12.45, label: "Royalty - Episode 04", deposit: 200, totalDuration: 90 * 86400, policy: "standard", category: "SUBSCRIPTION" },
-    { id: "str_2210", dir: "out", party: "Render-GPU-Cluster", addr: "Aj4Q...7P2x", token: "USDC", rate: 0.0083, status: "streaming", started: now - 6 * 3600e3, base: 178.94, label: "GPU compute - Render network", deposit: 4000, totalDuration: 21 * 86400, policy: "agent", budgetCap: 5000, autoRevoke: "2026-06-30", category: "AI_COMPUTE" },
-    { id: "str_1908", dir: "out", party: "Llama-3-Inference-API", addr: "K91v...4Mtt", token: "USDC", rate: 0.00012, status: "streaming", started: now - 22 * 3600e3, base: 8.214, label: "Inference - per-token metered", deposit: 100, totalDuration: 60 * 86400, policy: "agent", budgetCap: 500, autoRevoke: "2026-05-31", category: "AI_COMPUTE" },
-    { id: "str_1144", dir: "out", party: "Data-Scraper-Bot-04", addr: "Z4qC...dA08", token: "USDC", rate: 0.000045, status: "streaming", started: now - 9 * 86400e3, base: 4.21, label: "Scraper - web ingestion", deposit: 250, totalDuration: 365 * 86400, policy: "agent", budgetCap: 250, autoRevoke: "2026-12-31", category: "AI_COMPUTE" },
+    { id: "str_4821", dir: "in",  party: "stripe-payroll.sol",    addr: "7Hk2...q4Wp", token: "USDC", rate: 0.0125,   status: "streaming", started: now, base: acc(5400.234,  0.0125,   5 * 86400),       label: "Salary - Stripe Inc",             deposit: 12000, totalDuration: 30  * 86400, policy: "standard", category: "HUMAN_PAYROLL" },
+    { id: "str_3902", dir: "in",  party: "client.maya.sol",        addr: "9Bc1...aL3z", token: "USDC", rate: 0.00231,  status: "streaming", started: now, base: acc(99.812,    0.00231,  12 * 3600),        label: "Freelance - Component lib",       deposit: 800,   totalDuration: 14  * 86400, policy: "standard", category: "HUMAN_PAYROLL" },
+    { id: "str_3711", dir: "in",  party: "lumen.tv",               addr: "F2dN...r88M", token: "USDC", rate: 0.00041,  status: "paused",    started: now, base: 12.45,                                       label: "Royalty - Episode 04",            deposit: 200,   totalDuration: 90  * 86400, policy: "standard", category: "SUBSCRIPTION" },
+    { id: "str_2210", dir: "out", party: "Render-GPU-Cluster",     addr: "Aj4Q...7P2x", token: "USDC", rate: 0.0083,   status: "streaming", started: now, base: acc(178.94,    0.0083,   6 * 3600),         label: "GPU compute - Render network",    deposit: 4000,  totalDuration: 21  * 86400, policy: "agent",    budgetCap: 5000, autoRevoke: "2026-06-30", category: "AI_COMPUTE" },
+    { id: "str_1908", dir: "out", party: "Llama-3-Inference-API",  addr: "K91v...4Mtt", token: "USDC", rate: 0.00012,  status: "streaming", started: now, base: acc(8.214,     0.00012,  22 * 3600),        label: "Inference - per-token metered",   deposit: 100,   totalDuration: 60  * 86400, policy: "agent",    budgetCap: 500,  autoRevoke: "2026-05-31", category: "AI_COMPUTE" },
+    { id: "str_1144", dir: "out", party: "Data-Scraper-Bot-04",    addr: "Z4qC...dA08", token: "USDC", rate: 0.000045, status: "streaming", started: now, base: acc(4.21,      0.000045, 9 * 86400),        label: "Scraper - web ingestion",         deposit: 250,   totalDuration: 365 * 86400, policy: "agent",    budgetCap: 250,  autoRevoke: "2026-12-31", category: "AI_COMPUTE" },
   ];
 }
 

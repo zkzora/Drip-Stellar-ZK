@@ -4,6 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { useDripWallet } from "@/lib/solana/useDripWallet";
+import { useDripStreams } from "@/lib/solana/useDripStreams";
+import BN from "bn.js";
+import { PublicKey } from "@solana/web3.js";
+import { createStream as createSolanaStream } from "@/lib/solana/stream";
+import { generateStreamId } from "@/lib/solana/pda";
+import { LAMPORTS_PER_SOL_NUM, SOLANA_CLUSTER, SOLANA_RPC_URL, DRIP_PROGRAM_ID, DRIP_PROGRAM_ID_CONFIGURED } from "@/lib/solana/constants";
+import { getExplorerTxUrl } from "@/lib/solana/explorer";
 import {
   AGENT_LOG_DEMO,
   AGENTS,
@@ -248,8 +255,8 @@ function WalletDemoNotice({ error, onConnect }: any) {
 // DASHBOARD page
 // =========================================================================
 function DashboardPage({ streams, onNewStream, onGoTo, walletConnected, walletError, onConnectWallet, onRequireWallet }: any) {
-  const inSum = streams.filter((s) => s.dir === "in" && s.status === "streaming" && s.token === "USDC").reduce((a, s) => a + s.rate, 0);
-  const outSum = streams.filter((s) => s.dir === "out" && s.status === "streaming" && s.token === "USDC").reduce((a, s) => a + s.rate, 0);
+  const inSum = streams.filter((s) => s.dir === "in" && s.status === "streaming").reduce((a, s) => a + s.rate, 0);
+  const outSum = streams.filter((s) => s.dir === "out" && s.status === "streaming").reduce((a, s) => a + s.rate, 0);
   const net = inSum - outSum;
   const positive = net >= 0;
 
@@ -416,8 +423,10 @@ function SummaryTile({ icon, label, value, sub, accent, onClick }: any) {
 
 function MiniStreamRow({ stream }: any) {
   const running = stream.status === "streaming";
-  const elapsed = (Date.now() - stream.started) / 1000;
-  const value = useStreamingValue(stream.base + elapsed * stream.rate, stream.rate, running);
+  // stream.base is already the current accumulated amount (pre-computed in createSeedStreams
+  // or set to unlocked-at-refresh in useDripStreams). Passing it directly avoids
+  // computing Date.now() during render, which caused SSR/client hydration mismatches.
+  const value = useStreamingValue(stream.base, stream.rate, running);
   const isIn = stream.dir === "in";
   return (
     <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4 flex items-center gap-4">
@@ -441,10 +450,14 @@ function MiniStreamRow({ stream }: any) {
 
 function FlowSparkline({ net }: any) {
   const points = useMemo(() => {
+    // Deterministic xorshift32 seeded from net so SSR output matches client.
+    let s = ((net * 1e9) | 0) ^ 0xdeadbeef;
+    if (s === 0) s = 1;
+    const rng = () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return (s >>> 0) / 0x100000000; };
     const N = 60;
-    let v = DASHBOARD_OVERVIEW_STATS.sparklineBase + Math.random() * 200;
+    let v = DASHBOARD_OVERVIEW_STATS.sparklineBase + rng() * 200;
     return Array.from({ length: N }, () => {
-      v += (Math.random() - 0.4) * 60 + (net > 0 ? 12 : -8);
+      v += (rng() - 0.4) * 60 + (net > 0 ? 12 : -8);
       return v;
     });
   }, [net]);
@@ -479,7 +492,7 @@ function FlowSparkline({ net }: any) {
 // =========================================================================
 // STREAMS page
 // =========================================================================
-function StreamsPage({ streams, setStreams, onNewStream, walletConnected, onRequireWallet }: any) {
+function StreamsPage({ streams, setStreams, onNewStream, walletConnected, onRequireWallet, streamsLoading, streamsError, onRefresh }: any) {
   const [filter, setFilter] = useState("all");
   const [topUpId, setTopUpId] = useState<string | null>(null);
 
@@ -542,7 +555,40 @@ function StreamsPage({ streams, setStreams, onNewStream, walletConnected, onRequ
         }
       />
 
+      {streamsError && (
+        <div className="rounded-xl border border-rose-500/30 bg-rose-500/[0.06] px-4 py-3 flex items-center gap-3">
+          <Icon name="triangle-alert" size={14} className="text-rose-300 shrink-0" />
+          <span className="text-[12.5px] text-rose-200 flex-1 font-mono break-all">{streamsError}</span>
+          <button onClick={onRefresh} className="btn-ghost rounded-full px-3 py-1.5 text-[12px] text-white/85 flex items-center gap-1.5 shrink-0">
+            <Icon name="refresh-cw" size={12} /> Retry
+          </button>
+        </div>
+      )}
+
+      {streamsLoading && (
+        <div className="flex items-center gap-2 text-[12.5px] font-mono text-violet-300/80">
+          <span className="inline-block w-3 h-3 rounded-full border-2 border-violet-400 border-t-transparent animate-spin" />
+          Fetching streams from chain...
+        </div>
+      )}
+
       <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {visible.length === 0 && !streamsLoading && (
+          <div className="col-span-full rounded-2xl border border-white/8 bg-white/[0.02] p-12 text-center">
+            <div className="w-12 h-12 rounded-full bg-violet-400/10 flex items-center justify-center mx-auto mb-4">
+              <Icon name="waves" size={20} className="text-violet-300/60" />
+            </div>
+            <div className="text-[15px] text-white/60">No streams found</div>
+            <div className="mt-1.5 text-[12.5px] font-mono text-white/35">
+              {walletConnected ? "Create your first stream to get started." : "Connect a wallet to see your on-chain streams."}
+            </div>
+            {walletConnected && (
+              <button onClick={onNewStream} className="mt-5 btn-primary rounded-full px-5 py-2.5 text-[13px] font-medium text-white inline-flex items-center gap-2">
+                <Icon name="plus" size={13} /> New stream
+              </button>
+            )}
+          </div>
+        )}
         {visible.map((s) => (
           <StreamCard
             key={s.id}
@@ -568,8 +614,7 @@ function StreamsPage({ streams, setStreams, onNewStream, walletConnected, onRequ
 
 function StreamCard({ stream, walletConnected, onToggle, onCancel, onTopUp }: any) {
   const running = stream.status === "streaming";
-  const elapsed = (Date.now() - stream.started) / 1000;
-  const accrued = useStreamingValue(stream.base + elapsed * stream.rate, stream.rate, running);
+  const accrued = useStreamingValue(stream.base, stream.rate, running);
 
   const isIn = stream.dir === "in";
   const isCompleted = stream.status === "completed";
@@ -1123,18 +1168,21 @@ function SettingRow({ label, value, tone }: any) {
 // =========================================================================
 // New Stream slide-over (with Smart Rate Converter)
 // =========================================================================
-function NewStreamDrawer({ open, onClose, onCreate, walletConnected, onConnectWallet }: any) {
+function NewStreamDrawer({ open, onClose, onCreate, walletConnected, onConnectWallet, txStatus = "idle", txSig, txError }: any) {
   const [recipient, setRecipient] = useState(NEW_STREAM_DEFAULTS.recipient);
-  const [token, setToken] = useState(NEW_STREAM_DEFAULTS.token);
-  const [amount, setAmount] = useState(NEW_STREAM_DEFAULTS.amount);
+  const [token, setToken] = useState("SOL");
+  const [amount, setAmount] = useState(0.1);
   const [period, setPeriod] = useState(NEW_STREAM_DEFAULTS.period);
   const [label, setLabel] = useState(NEW_STREAM_DEFAULTS.label);
-  const [deposit, setDeposit] = useState(NEW_STREAM_DEFAULTS.deposit);
+  const [deposit, setDeposit] = useState(1.0);
   const [policy, setPolicy] = useState(NEW_STREAM_DEFAULTS.policy);
-  const [budgetCap, setBudgetCap] = useState(NEW_STREAM_DEFAULTS.budgetCap);
+  const [budgetCap, setBudgetCap] = useState(0.5);
   const [autoRevoke, setAutoRevoke] = useState(NEW_STREAM_DEFAULTS.autoRevoke);
+  const [category, setCategory] = useState("OTHER");
+  const [expirationEnabled, setExpirationEnabled] = useState(false);
+  const [expirationDate, setExpirationDate] = useState("");
 
-  const periodSec = NEW_STREAM_DEFAULTS.periodSeconds[period];
+  const periodSec = NEW_STREAM_DEFAULTS.periodSeconds[period] ?? 86400;
   const perSec = amount / periodSec;
   const perDay = perSec * 86400;
   const perHour = perSec * 3600;
@@ -1142,11 +1190,12 @@ function NewStreamDrawer({ open, onClose, onCreate, walletConnected, onConnectWa
 
   const recipientOk = recipient.trim().length > 3;
   const formValid = recipientOk && amount > 0 && deposit > 0;
+  const txPending = txStatus === "confirming" || txStatus === "preparing";
 
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 fade-in">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={txPending ? undefined : onClose} />
       <div className="absolute right-0 top-0 bottom-0 w-full max-w-[520px] slide-in">
         <div className="h-full glass-strong border-l border-violet-400/20 bg-[#0b0a1a] flex flex-col">
           <div className="flex items-center justify-between px-7 py-5 border-b border-white/5">
@@ -1154,7 +1203,7 @@ function NewStreamDrawer({ open, onClose, onCreate, walletConnected, onConnectWa
               <div className="text-[11px] uppercase tracking-[0.2em] text-violet-300/70 font-mono">New stream</div>
               <h3 className="mt-1 text-[20px] tracking-tight">Pay anyone, per-second.</h3>
             </div>
-            <button onClick={onClose} className="w-9 h-9 rounded-full border border-white/10 hover:border-white/30 flex items-center justify-center text-white/60 hover:text-white">
+            <button onClick={txPending ? undefined : onClose} disabled={txPending} className="w-9 h-9 rounded-full border border-white/10 hover:border-white/30 flex items-center justify-center text-white/60 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed">
               <Icon name="x" size={14} />
             </button>
           </div>
@@ -1200,10 +1249,10 @@ function NewStreamDrawer({ open, onClose, onCreate, walletConnected, onConnectWa
               {policy === "agent" && (
                 <div className="mt-3 rounded-xl border border-violet-400/25 bg-violet-400/[0.06] p-3.5 space-y-3">
                   <div>
-                    <div className="text-[10.5px] uppercase tracking-[0.18em] text-violet-200/80 font-mono mb-1.5">Max Budget Cap</div>
+                    <div className="text-[10.5px] uppercase tracking-[0.18em] text-violet-200/80 font-mono mb-1.5">Max Budget Cap (SOL)</div>
                     <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/30 border border-white/8">
-                      <span className="text-white/40 font-num">$</span>
-                      <input type="number" value={budgetCap} onChange={(e) => setBudgetCap(Math.max(0, Number(e.target.value) || 0))} className="flex-1 bg-transparent outline-none font-num text-white num-stable" />
+                      <span className="text-white/40 font-num">◎</span>
+                      <input type="number" min={0} step={0.01} value={budgetCap} onChange={(e) => setBudgetCap(Math.max(0, Number(e.target.value) || 0))} className="flex-1 bg-transparent outline-none font-num text-white num-stable" />
                       <span className="text-[10.5px] font-mono text-white/45">stop after this amount</span>
                     </div>
                   </div>
@@ -1218,23 +1267,24 @@ function NewStreamDrawer({ open, onClose, onCreate, walletConnected, onConnectWa
             <Field label="Token">
               <div className="flex items-center gap-2">
                 {STREAM_TOKEN_OPTIONS.map((t) => (
-                  <button key={t.k} onClick={() => setToken(t.k)} className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border transition ${token === t.k ? "border-violet-400/45 bg-violet-400/10" : "border-white/8 bg-white/[0.02] hover:border-white/20"}`}>
+                  <button key={t.k} onClick={() => t.k === "SOL" && setToken(t.k)} disabled={t.k !== "SOL"} className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border transition ${token === t.k ? "border-violet-400/45 bg-violet-400/10" : "border-white/8 bg-white/[0.02] hover:border-white/20"} ${t.k !== "SOL" ? "opacity-30 cursor-not-allowed" : ""}`}>
                     <span className={`w-5 h-5 rounded-full bg-gradient-to-br ${t.color}`} />
                     <span className="text-[13px] text-white">{t.k}</span>
                   </button>
                 ))}
-                <span className="ml-auto text-[11px] font-mono text-white/40">Balance: {NEW_STREAM_DEFAULTS.tokenBalance} {token}</span>
+                <span className="ml-auto text-[11px] font-mono text-white/40">Native SOL only</span>
               </div>
             </Field>
 
             {/* Smart Rate Converter */}
-            <Field label="Smart rate converter" hint="Type human, get per-second.">
+            <Field label="Smart rate converter" hint="SOL amount per period.">
               <div className="flex items-stretch gap-2">
                 <div className="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/8 focus-within:border-violet-400/40 transition">
-                  <span className="text-white/40 text-[20px] font-num">$</span>
+                  <span className="text-white/40 text-[20px] font-num">◎</span>
                   <input
                     type="number"
                     min={0}
+                    step={0.001}
                     value={amount}
                     onChange={(e) => setAmount(Math.max(0, Number(e.target.value) || 0))}
                     className="flex-1 bg-transparent outline-none text-[22px] font-num text-iri num-stable"
@@ -1253,21 +1303,23 @@ function NewStreamDrawer({ open, onClose, onCreate, walletConnected, onConnectWa
             <div className="rounded-2xl border border-violet-400/20 bg-violet-400/5 p-4">
               <div className="text-[10.5px] uppercase tracking-[0.18em] text-violet-200/80 font-mono">Auto-converted flow rate</div>
               <div className="mt-3 grid grid-cols-4 gap-2">
-                <BreakdownCell label="/sec"  value={`$${perSec.toFixed(7)}`} accent />
-                <BreakdownCell label="/min"  value={`$${perMin.toFixed(4)}`} />
-                <BreakdownCell label="/hr"   value={`$${perHour.toFixed(2)}`} />
-                <BreakdownCell label="/day"  value={`$${perDay.toFixed(2)}`} />
+                <BreakdownCell label="/sec"  value={`◎${perSec.toFixed(7)}`} accent />
+                <BreakdownCell label="/min"  value={`◎${perMin.toFixed(4)}`} />
+                <BreakdownCell label="/hr"   value={`◎${perHour.toFixed(2)}`} />
+                <BreakdownCell label="/day"  value={`◎${perDay.toFixed(2)}`} />
               </div>
               <div className="mt-3 text-[11.5px] font-mono text-white/45">
                 Settles every <span className="text-violet-200">{PROTOCOL_STATS.blockTime}</span> on Solana Â· receiver can withdraw mid-stream
               </div>
             </div>
 
-            <Field label="Initial deposit" hint="How much to lock in escrow up front">
+            <Field label="Initial deposit (SOL)" hint="How much SOL to lock in escrow">
               <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/8 focus-within:border-violet-400/40 transition">
-                <span className="text-white/40 text-[18px] font-num">$</span>
+                <span className="text-white/40 text-[18px] font-num">◎</span>
                 <input
                   type="number"
+                  min={0}
+                  step={0.001}
                   value={deposit}
                   onChange={(e) => setDeposit(Math.max(0, Number(e.target.value) || 0))}
                   className="flex-1 bg-transparent outline-none text-[18px] font-num text-white num-stable"
@@ -1285,6 +1337,44 @@ function NewStreamDrawer({ open, onClose, onCreate, walletConnected, onConnectWa
               />
             </Field>
 
+            <Field label="Category" hint="For compliance reporting">
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl bg-[#0b0a1a] border border-white/8 focus:border-violet-400/40 outline-none text-[13.5px] text-white"
+                style={{ colorScheme: "dark" }}
+              >
+                <option value="AI_COMPUTE">AI Compute</option>
+                <option value="API_COSTS">API Costs</option>
+                <option value="HUMAN_PAYROLL">Human Payroll</option>
+                <option value="B2B_SUBSCRIPTION">B2B Subscription</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </Field>
+
+            {policy === "standard" && (
+              <Field label="Expiration" hint="Optional - caps accrual time">
+                <div className="flex items-center gap-3 mb-2">
+                  <button
+                    onClick={() => setExpirationEnabled((v) => !v)}
+                    className={`w-10 h-6 rounded-full p-0.5 transition ${expirationEnabled ? "bg-violet-500" : "bg-white/15"}`}
+                  >
+                    <span className={`block w-5 h-5 rounded-full bg-white transition-transform ${expirationEnabled ? "translate-x-4" : ""}`} />
+                  </button>
+                  <span className="text-[12px] text-white/55 font-mono">{expirationEnabled ? "Enabled" : "Disabled"}</span>
+                </div>
+                {expirationEnabled && (
+                  <input
+                    type="datetime-local"
+                    value={expirationDate}
+                    onChange={(e) => setExpirationDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-white/[0.03] border border-white/8 focus:border-violet-400/40 outline-none font-mono text-[13px] text-white"
+                    style={{ colorScheme: "dark" }}
+                  />
+                )}
+              </Field>
+            )}
+
             <div className="rounded-xl border border-white/8 bg-white/[0.02] p-4 flex items-center gap-4">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400/20 to-violet-400/20 flex items-center justify-center text-emerald-300">
                 <Icon name="sprout" size={16} />
@@ -1297,24 +1387,66 @@ function NewStreamDrawer({ open, onClose, onCreate, walletConnected, onConnectWa
             </div>
           </div>
 
-          <div className="px-7 py-5 border-t border-white/5 flex items-center gap-3">
-            <div className="flex-1 text-[11px] font-mono text-white/40">
-              <span className="text-white/65">Network fee:</span> ~{NEW_STREAM_DEFAULTS.networkFee} Â· <span className="text-white/65">Protocol:</span> {PROTOCOL_STATS.streamFee}
-            </div>
-            <button onClick={onClose} className="btn-ghost rounded-full px-4 py-2.5 text-[13px] text-white/85">Cancel</button>
-            <button
-              disabled={walletConnected && !formValid}
-              onClick={() => {
-                if (!walletConnected) {
-                  onConnectWallet?.();
-                  return;
+          <div className="px-7 py-5 border-t border-white/5 space-y-3">
+            {txStatus === "error" && txError && (
+              <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3.5 py-2.5 text-[12px] font-mono text-rose-200 flex items-start gap-2">
+                <Icon name="triangle-alert" size={12} className="shrink-0 mt-0.5 text-rose-300" />
+                <span className="break-all">{txError}</span>
+              </div>
+            )}
+            {txStatus === "success" && txSig && (
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2.5 text-[12px] font-mono text-emerald-200 flex items-center gap-2">
+                <Icon name="check-circle-2" size={12} className="shrink-0 text-emerald-300" />
+                <span>Stream created on-chain.</span>
+                <a href={getExplorerTxUrl(txSig)} target="_blank" rel="noopener noreferrer" className="ml-auto text-violet-300 hover:text-violet-100 flex items-center gap-1 shrink-0">
+                  Explorer <Icon name="external-link" size={10} />
+                </a>
+              </div>
+            )}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 text-[11px] font-mono text-white/40">
+                {txPending ? (
+                  <span className="text-violet-300 flex items-center gap-1.5">
+                    <span className="inline-block w-3 h-3 rounded-full border-2 border-violet-400 border-t-transparent animate-spin" />
+                    Waiting for confirmation...
+                  </span>
+                ) : (
+                  <><span className="text-white/65">Network fee:</span> ~{NEW_STREAM_DEFAULTS.networkFee}</>
+                )}
+              </div>
+              <button onClick={txPending ? undefined : onClose} disabled={txPending} className="btn-ghost rounded-full px-4 py-2.5 text-[13px] text-white/85 disabled:opacity-40 disabled:cursor-not-allowed">Cancel</button>
+              <button
+                disabled={txPending || (walletConnected && !formValid)}
+                onClick={() => {
+                  if (!walletConnected) { onConnectWallet?.(); return; }
+                  if (!txPending && formValid) {
+                    onCreate({ recipient, token, amount, period, label, perSec, deposit, policy, budgetCap, autoRevoke, category, expirationEnabled, expirationDate });
+                  }
+                }}
+                className={`btn-primary rounded-full px-5 py-2.5 text-[13px] font-medium text-white flex items-center gap-2 ${txPending || (walletConnected && !formValid) ? "opacity-40 cursor-not-allowed" : ""}`}
+              >
+                {txPending
+                  ? <><span className="inline-block w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" /> Signing...</>
+                  : <><Icon name="zap" size={13} /> {walletConnected ? "Start streaming" : "Connect wallet"}</>
                 }
-                formValid && onCreate({ recipient, token, amount, period, label, perSec, deposit, policy, budgetCap, autoRevoke });
-              }}
-              className={`btn-primary rounded-full px-5 py-2.5 text-[13px] font-medium text-white flex items-center gap-2 ${walletConnected && !formValid ? "opacity-40 cursor-not-allowed" : ""}`}
-            >
-              <Icon name="zap" size={13} /> {walletConnected ? "Start streaming" : "Connect wallet"}
-            </button>
+              </button>
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-white/[0.04]">
+              {!DRIP_PROGRAM_ID_CONFIGURED && (
+                <span className="flex items-center gap-1 text-[10px] font-mono text-amber-300/80">
+                  <Icon name="triangle-alert" size={10} /> program ID not set
+                </span>
+              )}
+              {DRIP_PROGRAM_ID_CONFIGURED && (
+                <span className="text-[10px] font-mono text-white/25">
+                  {SOLANA_CLUSTER}
+                  <span className="text-white/15 mx-1">·</span>
+                  {DRIP_PROGRAM_ID.toBase58().slice(0, 6)}...{DRIP_PROGRAM_ID.toBase58().slice(-4)}
+                  <span className="text-white/15 mx-1">·</span>
+                  {(() => { try { return new URL(SOLANA_RPC_URL).hostname; } catch { return SOLANA_RPC_URL; } })()}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -1360,11 +1492,14 @@ function RouteTransition({ k, children }: any) {
 }
 
 export default function DashboardApp() {
-  const [streams, setStreams] = useState(() => createSeedStreams());
+  const { streams, setStreams, loading: streamsLoading, error: streamsError, refresh: refreshStreams, usingMockData } = useDripStreams();
   const [drawer, setDrawer] = useState(false);
   const [route, setRoute] = useState("dashboard");
   const [walletPrompt, setWalletPrompt] = useState<string | null>(null);
-  const { connected, connect, error: walletError } = useDripWallet();
+  const [txStatus, setTxStatus] = useState<"idle"|"preparing"|"confirming"|"success"|"error">("idle");
+  const [txSig, setTxSig] = useState<string|null>(null);
+  const [txError, setTxError] = useState<string|null>(null);
+  const { connected, connect, wallet, publicKey, error: walletError } = useDripWallet();
   const router = useRouter();
 
   useEffect(() => {
@@ -1387,6 +1522,9 @@ export default function DashboardApp() {
 
   const openNewStream = useCallback(() => {
     if (!requireWallet("Connect a wallet before creating a stream.")) return;
+    setTxStatus("idle");
+    setTxSig(null);
+    setTxError(null);
     setDrawer(true);
   }, [requireWallet]);
 
@@ -1398,32 +1536,107 @@ export default function DashboardApp() {
     setRoute(nextRoute);
   };
 
-  const handleCreate = (data) => {
+  const handleCreate = async (data) => {
     if (!requireWallet("Connect a wallet before creating a stream.")) return;
+    if (!wallet) return;
 
-    const id = "str_" + Math.floor(Math.random() * 9000 + 1000);
-    setStreams((arr) => [
-      {
-        id,
-        dir: "out",
-        party: data.recipient,
-        addr: data.recipient.length > 12 ? data.recipient.slice(0, 4) + "â€¦" + data.recipient.slice(-4) : data.recipient,
-        token: data.token,
-        rate: data.perSec,
-        status: "streaming",
-        started: Date.now(),
-        base: 0,
-        label: data.label || "New stream",
-        deposit: data.deposit,
-        totalDuration: data.deposit / (data.perSec || 0.0001),
-        policy: data.policy,
-        budgetCap: data.policy === "agent" ? data.budgetCap : undefined,
-        autoRevoke: data.policy === "agent" ? data.autoRevoke : undefined,
-      },
-      ...arr,
-    ]);
-    setDrawer(false);
-    setRoute("streams");
+    if (!DRIP_PROGRAM_ID_CONFIGURED) {
+      setTxStatus("error");
+      setTxError("DRIP program ID is not configured. Set NEXT_PUBLIC_DRIP_PROGRAM_ID in .env.local.");
+      return;
+    }
+
+    // Validate recipient is a valid Solana base58 public key.
+    let receiverPubkey: any;
+    try {
+      receiverPubkey = new PublicKey(data.recipient.trim());
+    } catch {
+      setTxStatus("error");
+      setTxError("Invalid recipient. Enter a valid Solana base58 address (e.g. 9Abc...XYZ).");
+      return;
+    }
+    if (publicKey && receiverPubkey.equals(publicKey)) {
+      setTxStatus("error");
+      setTxError("Receiver cannot be the same as your wallet address.");
+      return;
+    }
+
+    const L = LAMPORTS_PER_SOL_NUM;
+    const depositLamports = new BN(Math.floor(data.deposit * L));
+    const flowRate = new BN(Math.max(1, Math.floor(data.perSec * L)));
+    const maxBudget = data.policy === "agent" && data.budgetCap > 0
+      ? new BN(Math.floor(data.budgetCap * L))
+      : new BN(0);
+
+    let expirationTime = 0;
+    const revokeSrc = data.policy === "agent"
+      ? data.autoRevoke
+      : data.expirationEnabled ? data.expirationDate : "";
+    if (revokeSrc) {
+      const ts = Math.floor(new Date(revokeSrc).getTime() / 1000);
+      if (ts > Math.floor(Date.now() / 1000)) expirationTime = ts;
+    }
+
+    const streamId = generateStreamId();
+    setTxStatus("confirming");
+    setTxSig(null);
+    setTxError(null);
+
+    try {
+      const result = await createSolanaStream({
+        wallet,
+        receiver: receiverPubkey,
+        streamId,
+        depositedAmountLamports: depositLamports,
+        flowRateLamportsPerSecond: flowRate,
+        maxBudgetLamports: maxBudget,
+        expirationTime,
+      });
+
+      setTxSig(result.signature);
+      setTxStatus("success");
+
+      const short = (s: string) => s.length > 10 ? `${s.slice(0,4)}...${s.slice(-4)}` : s;
+      setStreams((arr) => [
+        {
+          id: "str_" + (Date.now() % 1_000_000).toString(),
+          dir: "out",
+          party: data.recipient,
+          addr: short(data.recipient),
+          token: "SOL",
+          rate: data.perSec,
+          status: "streaming",
+          started: Date.now(),
+          base: 0,
+          label: data.label || "New stream",
+          deposit: data.deposit,
+          totalDuration: data.deposit / (data.perSec || 0.0001),
+          policy: data.policy,
+          budgetCap: data.policy === "agent" ? data.budgetCap : undefined,
+          autoRevoke: data.policy === "agent" ? data.autoRevoke : undefined,
+          category: data.category,
+        },
+        ...arr,
+      ]);
+      setRoute("streams");
+
+      setTimeout(() => {
+        setDrawer(false);
+        setTxStatus("idle");
+        setTxSig(null);
+        void refreshStreams();
+      }, 2500);
+    } catch (err: any) {
+      setTxStatus("error");
+      const msg: string = err?.message ?? String(err);
+      if (msg.includes("Attempt to load a program that does not exist")) {
+        setTxError(
+          "The DRIP program is not deployed on this cluster. Check NEXT_PUBLIC_DRIP_PROGRAM_ID and NEXT_PUBLIC_SOLANA_RPC_URL in .env.local.",
+        );
+      } else {
+        setTxError(msg.length > 250 ? msg.slice(0, 250) + "..." : msg);
+      }
+    }
   };
 
   return (
@@ -1440,9 +1653,21 @@ export default function DashboardApp() {
               {walletError ? <span className="text-rose-300">{walletError}</span> : null}
             </div>
           )}
+          {!usingMockData && streamsLoading && (
+            <div className="mb-4 flex items-center gap-2 text-[12px] font-mono text-violet-300/70">
+              <span className="inline-block w-3 h-3 rounded-full border-2 border-violet-400 border-t-transparent animate-spin" />
+              Syncing streams from chain...
+            </div>
+          )}
+          {usingMockData && connected && (
+            <div className="mb-4 rounded-xl border border-amber-400/20 bg-amber-400/[0.04] px-4 py-2.5 text-[12px] font-mono text-amber-200/70 flex items-center gap-2">
+              <Icon name="triangle-alert" size={12} className="text-amber-300" />
+              Showing demo data. Fetching your on-chain streams...
+            </div>
+          )}
           <RouteTransition k={route}>
             {route === "dashboard" && <DashboardPage streams={streams} onNewStream={openNewStream} onGoTo={setRoute} walletConnected={connected} walletError={walletError} onConnectWallet={connectWallet} onRequireWallet={requireWallet} />}
-            {route === "streams"   && <StreamsPage   streams={streams} setStreams={setStreams} onNewStream={openNewStream} walletConnected={connected} onRequireWallet={requireWallet} />}
+            {route === "streams"   && <StreamsPage   streams={streams} setStreams={setStreams} onNewStream={openNewStream} walletConnected={connected} onRequireWallet={requireWallet} streamsLoading={streamsLoading} streamsError={streamsError} onRefresh={refreshStreams} />}
             {route === "yield"     && <YieldPage     streams={streams} walletConnected={connected} onRequireWallet={requireWallet} />}
             {route === "history"   && <HistoryPage />}
             {route === "agents"    && <AgentsPage />}
@@ -1454,7 +1679,16 @@ export default function DashboardApp() {
           </div>
         </main>
       </div>
-      <NewStreamDrawer open={drawer} onClose={() => setDrawer(false)} onCreate={handleCreate} walletConnected={connected} onConnectWallet={connectWallet} />
+      <NewStreamDrawer
+        open={drawer}
+        onClose={() => { setDrawer(false); setTxStatus("idle"); setTxSig(null); setTxError(null); }}
+        onCreate={handleCreate}
+        walletConnected={connected}
+        onConnectWallet={connectWallet}
+        txStatus={txStatus}
+        txSig={txSig}
+        txError={txError}
+      />
     </div>
   );
 }
