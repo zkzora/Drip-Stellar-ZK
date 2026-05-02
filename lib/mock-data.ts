@@ -234,7 +234,7 @@ export const ECOSYSTEM_PARTNERS = [
   { name: "Solana", role: "Settlement layer", icon: "circle-dot", note: "400ms blocks · 65k TPS" },
   { name: "Privy", role: "Auth & wallets", icon: "fingerprint", note: "Email, Google, Apple" },
   { name: "MoonPay", role: "Fiat on-ramp", icon: "banknote", note: "Card -> USDC in 12s" },
-  { name: "Raydium", role: "Yield routing", icon: "sprout", note: "Idle escrow -> 4.81% APY" },
+  { name: "Raydium", role: "Yield routing (roadmap)", icon: "sprout", note: "Idle escrow yield - coming soon" },
 ];
 
 export const FINAL_CTA_STATS = ["devnet · live", "$2.4M streamed in test", "1,284 active streams"];

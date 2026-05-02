@@ -283,14 +283,15 @@ function StreamingCard() {
             <span className="text-white/85">{LANDING_STREAMING_CARD.token}</span>
             <span className="ml-1.5 text-white/35">{LANDING_STREAMING_CARD.tokenKind}</span>
           </DetailRow>
-          <DetailRow label="Yield (Raydium)">
-            <span className="text-emerald-300/90">+{PROTOCOL_STATS.yieldApy.toFixed(2)}% APY</span>
+          <DetailRow label="Yield (roadmap)">
+            <span className="text-white/35 line-through">{PROTOCOL_STATS.yieldApy.toFixed(2)}% APY</span>
+            <span className="ml-2 text-[9.5px] font-mono text-amber-300/60 uppercase tracking-[0.14em]">coming soon</span>
           </DetailRow>
         </div>
 
         <div className="mt-5 flex items-center gap-2 pt-4 border-t border-white/5 text-[11px] text-white/40 font-mono">
           <Icon name="shield-check" size={12} className="text-violet-300" />
-          <span>Settled on-chain · slot {PROTOCOL_STATS.slot}</span>
+          <span>Vision preview · Native SOL MVP on devnet</span>
           <span className="ml-auto">tx {truncAddr(LANDING_STREAMING_CARD.txHash)}</span>
         </div>
       </div>
@@ -656,7 +657,10 @@ function DemoAgents() {
       </div>
 
       <div className="mt-6 rounded-2xl border border-white/5 bg-white/[0.02] p-3 flex-1 overflow-hidden">
-        <div className="text-[10.5px] uppercase tracking-[0.2em] text-white/40 font-mono px-2 py-1.5">Live settlement log</div>
+        <div className="flex items-center justify-between px-2 py-1.5">
+          <span className="text-[10.5px] uppercase tracking-[0.2em] text-white/40 font-mono">Settlement log</span>
+          <span className="text-[9.5px] font-mono text-amber-300/60 uppercase tracking-[0.14em]">demo simulation</span>
+        </div>
         <div className="space-y-1.5 codeblock">
           {events.map((e, i) => {
             const active = i === tick % events.length;
@@ -852,7 +856,7 @@ function Ecosystem() {
         <SectionHeader
           eyebrow="04  -  Trust & ecosystem"
           title={<>The pipes underneath.</>}
-          sub="Drip composes with the best of Solana  -  payment, custody, on-ramp and yield, each handled by a specialist."
+          sub="Drip composes with the best of Solana  -  payment, custody, and on-ramp. Yield routing via Raydium is on the roadmap."
         />
         <div className="mt-12 grid md:grid-cols-2 lg:grid-cols-4 gap-4">
           {ECOSYSTEM_PARTNERS.map((p) => (

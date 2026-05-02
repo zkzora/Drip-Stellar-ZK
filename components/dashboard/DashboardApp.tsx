@@ -187,11 +187,11 @@ function Sidebar({ active, onChange, streams }: any) {
 
       <div className="mt-auto">
         <div className="rounded-xl border border-violet-400/20 bg-violet-400/5 p-4">
-          <div className="text-[11px] uppercase tracking-[0.18em] text-violet-200/80 font-mono">Need fiat?</div>
-          <div className="mt-1.5 text-[13px] text-white/85">Top up via MoonPay - card to USDC in 12s.</div>
-          <button className="mt-3 w-full text-[12px] btn-ghost rounded-md py-1.5 hover:bg-violet-400/10 flex items-center justify-center gap-1.5">
-            <Icon name="credit-card" size={12} /> On-ramp
-          </button>
+          <div className="text-[11px] uppercase tracking-[0.18em] text-violet-200/80 font-mono">Native SOL MVP</div>
+          <div className="mt-1.5 text-[13px] text-white/85">Streams native SOL on devnet. SPL token support is on the roadmap.</div>
+          <a href="https://faucet.solana.com" target="_blank" rel="noopener noreferrer" className="mt-3 w-full text-[12px] btn-ghost rounded-md py-1.5 hover:bg-violet-400/10 flex items-center justify-center gap-1.5">
+            <Icon name="zap" size={12} /> Get devnet SOL
+          </a>
         </div>
         <div className="mt-4 flex items-center gap-2 px-2 text-[11px] font-mono text-white/35">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse-dot" />
@@ -613,9 +613,9 @@ function StreamsPage({ streams, setStreams, onNewStream, walletConnected, onRequ
             <div className="w-12 h-12 rounded-full bg-violet-400/10 flex items-center justify-center mx-auto mb-4">
               <Icon name="waves" size={20} className="text-violet-300/60" />
             </div>
-            <div className="text-[15px] text-white/60">No streams found</div>
+            <div className="text-[15px] text-white/60">No real streams yet</div>
             <div className="mt-1.5 text-[12.5px] font-mono text-white/35">
-              {walletConnected ? "Create your first stream to get started." : "Connect a wallet to see your on-chain streams."}
+              {walletConnected ? "Create your first programmable cashflow stream." : "Connect a wallet to see your on-chain streams."}
             </div>
             {walletConnected && (
               <button onClick={onNewStream} className="mt-5 btn-primary rounded-full px-5 py-2.5 text-[13px] font-medium text-white inline-flex items-center gap-2">
@@ -1251,8 +1251,8 @@ function AgentsPage({ streams = [], walletConnected = false, onNewStream, usingM
         <div className="rounded-xl border border-amber-400/25 bg-amber-400/5 px-5 py-4 flex items-center gap-4">
           <Icon name="triangle-alert" size={16} className="text-amber-300 shrink-0" />
           <div className="flex-1 min-w-0">
-            <span className="text-[13px] text-amber-200">Demo simulation</span>
-            <span className="text-[12px] text-white/50 ml-2">- create an AI Compute stream to connect real on-chain budget.</span>
+            <span className="text-[13px] text-amber-200">No on-chain agent stream found.</span>
+            <span className="text-[12px] text-white/50 ml-2">Create an AI Compute stream to connect a real on-chain budget.</span>
           </div>
           <button onClick={onNewStream} className="shrink-0 btn-ghost rounded-full px-3.5 py-1.5 text-[12px] text-amber-200 border border-amber-400/30 hover:border-amber-400/60 flex items-center gap-1.5">
             <Icon name="plus" size={12} /> Create stream
