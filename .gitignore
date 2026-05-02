@@ -28,3 +28,7 @@ pnpm-debug.log*
 # system
 .DS_Store
 Thumbs.db
+
+# AI Artifacts
+CLAUDE.md
+drip_internal_system_plan_md.md
