@@ -48,7 +48,13 @@ function mapToUiStream(stream: DripStream, walletKey: PublicKey): Record<string,
       stream.maxBudgetLamports.gtn(0) || stream.expirationTime > 0 ? "agent" : "standard",
     publicKey: stream.publicKey.toBase58(),
     receiverPublicKey: stream.receiver.toBase58(),
+    payerPublicKey: stream.payer.toBase58(),
     withdrawnAmountSol: stream.withdrawnAmountLamports.toNumber() / L,
+    // Fields preserved for compliance records
+    startedUnix: stream.startTime,
+    expirationTime: stream.expirationTime,
+    maxBudgetSol: stream.maxBudgetLamports.toNumber() / L,
+    totalPausedSeconds: stream.totalPausedSeconds,
   };
 }
 
