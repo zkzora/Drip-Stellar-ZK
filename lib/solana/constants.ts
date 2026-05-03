@@ -2,7 +2,7 @@ import { PublicKey } from "@solana/web3.js";
 
 export type SolanaCluster = "devnet" | "localnet" | "mainnet-beta";
 
-const FALLBACK_PROGRAM_ID = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkgPj3GVjKqLx";
+const FALLBACK_PROGRAM_ID = "D5u3CiH3drPiQfiXctrFe6yDCsFsqHcWQ5aAnC9pkKM6";
 const FALLBACK_RPC = "https://api.devnet.solana.com";
 const FALLBACK_CLUSTER: SolanaCluster = "devnet";
 
@@ -28,5 +28,6 @@ export const DRIP_PROGRAM_ID: PublicKey = parseProgramId();
 export const LAMPORTS_PER_SOL_NUM = 1_000_000_000;
 
 const _rawProgramId = process.env.NEXT_PUBLIC_DRIP_PROGRAM_ID;
+// Not configured only if someone explicitly set the placeholder string
 export const DRIP_PROGRAM_ID_CONFIGURED =
-  !!_rawProgramId && _rawProgramId !== "REPLACE_WITH_DEPLOYED_PROGRAM_ID";
+  _rawProgramId !== "REPLACE_WITH_DEPLOYED_PROGRAM_ID";

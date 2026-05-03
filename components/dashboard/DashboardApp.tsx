@@ -1975,7 +1975,7 @@ export default function DashboardApp() {
 
     if (!DRIP_PROGRAM_ID_CONFIGURED) {
       setTxStatus("error");
-      setTxError("DRIP program ID is not configured. Set NEXT_PUBLIC_DRIP_PROGRAM_ID in .env.local.");
+      setTxError("DRIP program ID is not configured. Set NEXT_PUBLIC_DRIP_PROGRAM_ID in Vercel dashboard (or .env.local for local dev), then redeploy.");
       return;
     }
 
@@ -2106,7 +2106,7 @@ export default function DashboardApp() {
   ) => {
     if (!requireWallet()) return;
     if (!DRIP_PROGRAM_ID_CONFIGURED) {
-      setStreamActions((prev) => ({ ...prev, [stream.id]: { pending: null, txSig: null, error: "DRIP program ID is not configured. Set NEXT_PUBLIC_DRIP_PROGRAM_ID in .env.local." } }));
+      setStreamActions((prev) => ({ ...prev, [stream.id]: { pending: null, txSig: null, error: "DRIP program ID is not configured. Set NEXT_PUBLIC_DRIP_PROGRAM_ID in Vercel dashboard (or .env.local for local dev), then redeploy." } }));
       return;
     }
     // Guard: synchronously block re-entry for the same stream using a ref
