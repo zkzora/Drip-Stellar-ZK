@@ -509,16 +509,16 @@ export default function CompliancePage() {
       <section className="space-y-3">
         <SectionLabel num="04" title="On-chain ledger preview" desc="Exact rows that will appear in your export." />
         <div className="rounded-2xl glass overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-3 border-b border-white/5 bg-white/[0.02]">
-            <div className="flex items-center gap-2 text-[11.5px] font-mono">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse-dot" />
+          <div className="flex items-center justify-between gap-3 flex-wrap px-5 py-3 border-b border-white/5 bg-white/[0.02]">
+            <div className="flex items-center gap-2 text-[11.5px] font-mono flex-wrap">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse-dot shrink-0" />
               <span className="text-emerald-300">100% On-Chain Verified</span>
               <span className="text-emerald-300/50">·</span>
               <span className="text-emerald-200/80">{COMPLIANCE_EXPORT.ledgerNetworkLabel}</span>
               <span className="text-white/30">·</span>
               <span className="text-white/55">{usingMockData ? filtered.length : realRecords.length} rows</span>
             </div>
-            <div className="flex items-center gap-2 text-[11.5px] font-mono text-white/45">
+            <div className="hidden sm:flex items-center gap-2 text-[11.5px] font-mono text-white/45">
               <Icon name="hash" size={11} />
               <span>Solana slot {PROTOCOL_STATS.complianceSlot}</span>
             </div>
@@ -527,7 +527,7 @@ export default function CompliancePage() {
           {/* Real records table */}
           {!usingMockData && realRecords.length > 0 && (
             <>
-              <div className="grid grid-cols-12 gap-2 px-5 py-2.5 text-[10px] uppercase tracking-[0.16em] text-white/40 font-mono border-b border-white/5">
+              <div className="hidden sm:grid grid-cols-12 gap-2 px-5 py-2.5 text-[10px] uppercase tracking-[0.16em] text-white/40 font-mono border-b border-white/5">
                 <div className="col-span-2">Stream account</div>
                 <div className="col-span-1">Dir</div>
                 <div className="col-span-2">Category</div>
@@ -545,7 +545,7 @@ export default function CompliancePage() {
           {/* Mock / demo records table */}
           {usingMockData && (
             <>
-              <div className="grid grid-cols-12 gap-2 px-5 py-2.5 text-[10px] uppercase tracking-[0.16em] text-white/40 font-mono border-b border-white/5">
+              <div className="hidden sm:grid grid-cols-12 gap-2 px-5 py-2.5 text-[10px] uppercase tracking-[0.16em] text-white/40 font-mono border-b border-white/5">
                 <div className="col-span-1">Date</div>
                 <div className="col-span-1">Type</div>
                 <div className="col-span-3">Counterparty · address</div>
@@ -667,36 +667,67 @@ function SecondaryAction({ icon, label, sub }: any) {
 
 function LedgerRow({ row }: any) {
   const isIn = row.type === "in";
+  const badge = (
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-mono uppercase tracking-[0.14em] ${isIn ? "bg-emerald-400/10 text-emerald-300" : "bg-rose-400/10 text-rose-300"}`}>
+      <Icon name={isIn ? "arrow-down-left" : "arrow-up-right"} size={10} />
+      {isIn ? "In" : "Out"}
+    </span>
+  );
   return (
-    <div className="grid grid-cols-12 gap-2 px-5 py-3.5 text-[12.5px] border-b border-white/[0.04] hover:bg-white/[0.02] items-center">
-      <div className="col-span-1 font-mono text-white/65">{row.date.slice(5)}</div>
-      <div className="col-span-1">
-        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-mono uppercase tracking-[0.14em] ${isIn ? "bg-emerald-400/10 text-emerald-300" : "bg-rose-400/10 text-rose-300"}`}>
-          <Icon name={isIn ? "arrow-down-left" : "arrow-up-right"} size={10} />
-          {isIn ? "In" : "Out"}
-        </span>
+    <>
+      {/* Mobile card */}
+      <div className="sm:hidden px-4 py-3.5 border-b border-white/[0.04] hover:bg-white/[0.02] space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            {badge}
+            <span className="text-[12.5px] text-white truncate">{row.counterparty}</span>
+          </div>
+          <span className={`font-num text-[13px] shrink-0 ${isIn ? "text-emerald-300" : "text-white"}`}>
+            {isIn ? "+" : "−"}${fmtUSD2(row.amount)}
+          </span>
+        </div>
+        <div className="flex items-center justify-between text-[11px] font-mono text-white/45">
+          <div className="flex items-center gap-2">
+            <span>{row.date.slice(5)}</span>
+            <span>·</span>
+            <span className="flex items-center gap-1">
+              <Icon name={CATEGORY_ICON[row.category]} size={10} />
+              {CATEGORY_LABELS[row.category] || row.category}
+            </span>
+            <span>·</span>
+            <span>{fmtDur(row.duration)}</span>
+          </div>
+          <a href="#" className="inline-flex items-center gap-0.5 text-violet-300/70 hover:text-white">
+            {row.tx.slice(0, 5)}… <Icon name="arrow-up-right" size={9} />
+          </a>
+        </div>
       </div>
-      <div className="col-span-3 min-w-0">
-        <div className="text-white truncate">{row.counterparty}</div>
-        <div className="text-[10.5px] font-mono text-white/40 truncate">{row.addr.slice(0, 6)}...{row.addr.slice(-6)}</div>
+      {/* Desktop grid row */}
+      <div className="hidden sm:grid grid-cols-12 gap-2 px-5 py-3.5 text-[12.5px] border-b border-white/[0.04] hover:bg-white/[0.02] items-center">
+        <div className="col-span-1 font-mono text-white/65">{row.date.slice(5)}</div>
+        <div className="col-span-1">{badge}</div>
+        <div className="col-span-3 min-w-0">
+          <div className="text-white truncate">{row.counterparty}</div>
+          <div className="text-[10.5px] font-mono text-white/40 truncate">{row.addr.slice(0, 6)}...{row.addr.slice(-6)}</div>
+        </div>
+        <div className="col-span-2">
+          <span className="inline-flex items-center gap-1.5 text-white/65 text-[11.5px]">
+            <Icon name={CATEGORY_ICON[row.category]} size={11} className="text-white/45" />
+            {CATEGORY_LABELS[row.category] || row.category}
+          </span>
+        </div>
+        <div className="col-span-1 text-right font-mono text-white/65">{fmtDur(row.duration)}</div>
+        <div className="col-span-2 text-right">
+          <span className={`font-num text-[14px] ${isIn ? "text-emerald-300" : "text-white"}`}>{isIn ? "+" : "-"}${fmtUSD2(row.amount)}</span>
+        </div>
+        <div className="col-span-2 text-right">
+          <a href="#" className="inline-flex items-center gap-1 font-mono text-[11px] text-violet-300/80 hover:text-white">
+            {row.tx.slice(0, 6)}...{row.tx.slice(-3)}
+            <Icon name="arrow-up-right" size={10} />
+          </a>
+        </div>
       </div>
-      <div className="col-span-2">
-        <span className="inline-flex items-center gap-1.5 text-white/65 text-[11.5px]">
-          <Icon name={CATEGORY_ICON[row.category]} size={11} className="text-white/45" />
-          {CATEGORY_LABELS[row.category] || row.category}
-        </span>
-      </div>
-      <div className="col-span-1 text-right font-mono text-white/65">{fmtDur(row.duration)}</div>
-      <div className="col-span-2 text-right">
-        <span className={`font-num text-[14px] ${isIn ? "text-emerald-300" : "text-white"}`}>{isIn ? "+" : "-"}${fmtUSD2(row.amount)}</span>
-      </div>
-      <div className="col-span-2 text-right">
-        <a href="#" className="inline-flex items-center gap-1 font-mono text-[11px] text-violet-300/80 hover:text-white">
-          {row.tx.slice(0, 6)}...{row.tx.slice(-3)}
-          <Icon name="arrow-up-right" size={10} />
-        </a>
-      </div>
-    </div>
+    </>
   );
 }
 
@@ -705,57 +736,76 @@ function RealLedgerRow({ record }: { record: ComplianceStreamRecord }) {
   const shortAccount = record.streamAccount
     ? `${record.streamAccount.slice(0, 6)}...${record.streamAccount.slice(-4)}`
     : "-";
+  const dirBadge = (
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-mono uppercase tracking-[0.14em] ${isIn ? "bg-emerald-400/10 text-emerald-300" : "bg-rose-400/10 text-rose-300"}`}>
+      <Icon name={isIn ? "arrow-down-left" : "arrow-up-right"} size={10} />
+      {isIn ? "In" : "Out"}
+    </span>
+  );
+  const statusCls = record.status === "streaming" ? "bg-emerald-400/10 text-emerald-300"
+    : record.status === "paused" ? "bg-amber-400/10 text-amber-300"
+    : "bg-white/5 text-white/55";
   return (
-    <div className="grid grid-cols-12 gap-2 px-5 py-3.5 text-[12.5px] border-b border-white/[0.04] hover:bg-white/[0.02] items-center">
-      <div className="col-span-2 font-mono text-white/65 truncate" title={record.streamAccount}>{shortAccount}</div>
-      <div className="col-span-1">
-        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-mono uppercase tracking-[0.14em] ${isIn ? "bg-emerald-400/10 text-emerald-300" : "bg-rose-400/10 text-rose-300"}`}>
-          <Icon name={isIn ? "arrow-down-left" : "arrow-up-right"} size={10} />
-          {isIn ? "In" : "Out"}
-        </span>
+    <>
+      {/* Mobile card */}
+      <div className="sm:hidden px-4 py-3.5 border-b border-white/[0.04] hover:bg-white/[0.02] space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            {dirBadge}
+            <span className="font-mono text-[11.5px] text-white/65 truncate">{shortAccount}</span>
+          </div>
+          <span className={`font-num text-[13px] shrink-0 ${isIn ? "text-emerald-300" : "text-white"}`}>
+            {isIn ? "+" : "−"}{fmtSol4(record.depositedAmountSol)} SOL
+          </span>
+        </div>
+        <div className="flex items-center justify-between text-[11px] font-mono text-white/45">
+          <div className="flex items-center gap-2">
+            <span className={`px-1.5 py-0.5 rounded-full text-[9.5px] ${statusCls}`}>{record.status}</span>
+            <span>·</span>
+            <span className="flex items-center gap-1">
+              <Icon name={record.category === "AI_COMPUTE" ? "cpu" : "layers"} size={10} />
+              {record.category}
+            </span>
+            {record.durationSeconds > 0 && <><span>·</span><span>{fmtDur(record.durationSeconds)}</span></>}
+          </div>
+          {record.explorerUrl ? (
+            <a href={record.explorerUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-violet-300/70 hover:text-white">
+              Solscan <Icon name="arrow-up-right" size={9} />
+            </a>
+          ) : <span>-</span>}
+        </div>
       </div>
-      <div className="col-span-2">
-        <span className="inline-flex items-center gap-1.5 text-white/65 text-[11.5px]">
-          {record.category === "AI_COMPUTE" ? (
-            <Icon name="cpu" size={11} className="text-white/45" />
+      {/* Desktop grid row */}
+      <div className="hidden sm:grid grid-cols-12 gap-2 px-5 py-3.5 text-[12.5px] border-b border-white/[0.04] hover:bg-white/[0.02] items-center">
+        <div className="col-span-2 font-mono text-white/65 truncate" title={record.streamAccount}>{shortAccount}</div>
+        <div className="col-span-1">{dirBadge}</div>
+        <div className="col-span-2">
+          <span className="inline-flex items-center gap-1.5 text-white/65 text-[11.5px]">
+            <Icon name={record.category === "AI_COMPUTE" ? "cpu" : "layers"} size={11} className="text-white/45" />
+            {record.category}
+          </span>
+        </div>
+        <div className="col-span-2">
+          <span className={`text-[11px] font-mono px-2 py-0.5 rounded-full ${statusCls}`}>{record.status}</span>
+        </div>
+        <div className="col-span-1 text-right font-mono text-white/65">
+          {record.durationSeconds > 0 ? fmtDur(record.durationSeconds) : "-"}
+        </div>
+        <div className="col-span-2 text-right">
+          <span className={`font-num text-[14px] ${isIn ? "text-emerald-300" : "text-white"}`}>
+            {isIn ? "+" : "-"}{fmtSol4(record.depositedAmountSol)} SOL
+          </span>
+        </div>
+        <div className="col-span-2 text-right">
+          {record.explorerUrl ? (
+            <a href={record.explorerUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-mono text-[11px] text-violet-300/80 hover:text-white">
+              {shortAccount} <Icon name="arrow-up-right" size={10} />
+            </a>
           ) : (
-            <Icon name="layers" size={11} className="text-white/45" />
+            <span className="text-white/30 font-mono text-[11px]">-</span>
           )}
-          {record.category}
-        </span>
+        </div>
       </div>
-      <div className="col-span-2">
-        <span className={`text-[11px] font-mono px-2 py-0.5 rounded-full ${
-          record.status === "streaming" ? "bg-emerald-400/10 text-emerald-300"
-          : record.status === "paused" ? "bg-amber-400/10 text-amber-300"
-          : "bg-white/5 text-white/55"
-        }`}>
-          {record.status}
-        </span>
-      </div>
-      <div className="col-span-1 text-right font-mono text-white/65">
-        {record.durationSeconds > 0 ? fmtDur(record.durationSeconds) : "-"}
-      </div>
-      <div className="col-span-2 text-right">
-        <span className={`font-num text-[14px] ${isIn ? "text-emerald-300" : "text-white"}`}>
-          {isIn ? "+" : "-"}{fmtSol4(record.depositedAmountSol)} SOL
-        </span>
-      </div>
-      <div className="col-span-2 text-right">
-        {record.explorerUrl ? (
-          <a
-            href={record.explorerUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 font-mono text-[11px] text-violet-300/80 hover:text-white"
-          >
-            {shortAccount}
-            <Icon name="arrow-up-right" size={10} />
-          </a>
-        ) : (
-          <span className="text-white/30 font-mono text-[11px]">-</span>
-        )}
-      </div>
-    </div>
+    </>
   );
 }

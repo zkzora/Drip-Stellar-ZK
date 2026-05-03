@@ -1130,7 +1130,7 @@ function HistoryPage() {
       </section>
 
       <section className="rounded-2xl glass overflow-hidden">
-        <div className="grid grid-cols-12 gap-2 px-6 py-3 text-[10.5px] uppercase tracking-[0.16em] text-white/40 font-mono border-b border-white/5">
+        <div className="hidden sm:grid grid-cols-12 gap-2 px-6 py-3 text-[10.5px] uppercase tracking-[0.16em] text-white/40 font-mono border-b border-white/5">
           <div className="col-span-1">Status</div>
           <div className="col-span-3">Counterparty</div>
           <div className="col-span-2 text-right">Final amount</div>
@@ -1151,29 +1151,57 @@ function HistoryPage() {
 
 function HistoryRow({ h }: any) {
   const ended = h.kind === "ended";
+  const badge = (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-mono uppercase tracking-[0.12em] ${ended ? "border-emerald-400/30 text-emerald-300 bg-emerald-400/5" : "border-amber-400/30 text-amber-300 bg-amber-400/5"}`}>
+      {ended ? "Ended" : "Cancelled"}
+    </span>
+  );
   return (
-    <div className="grid grid-cols-12 gap-2 px-6 py-4 text-[13px] border-b border-white/5 hover:bg-white/[0.02] items-center">
-      <div className="col-span-1">
-        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-mono uppercase tracking-[0.16em] ${ended ? "border-emerald-400/30 text-emerald-300 bg-emerald-400/5" : "border-amber-400/30 text-amber-300 bg-amber-400/5"}`}>
-          {ended ? "Ended" : "Cancelled"}
-        </span>
-      </div>
-      <div className="col-span-3 flex items-center gap-3 min-w-0">
-        <SolAvatar seed={h.party} size={28} />
-        <div className="min-w-0">
-          <div className="text-white truncate">{h.party}</div>
-          <div className="text-[10.5px] font-mono text-white/40">{h.id}</div>
+    <>
+      {/* Mobile card */}
+      <div className="sm:hidden px-4 py-3.5 border-b border-white/5 hover:bg-white/[0.02] space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <SolAvatar seed={h.party} size={26} />
+            <div className="min-w-0">
+              <div className="text-[13px] text-white truncate">{h.party}</div>
+              <div className="text-[10px] font-mono text-white/35 truncate">{h.id}</div>
+            </div>
+          </div>
+          {badge}
+        </div>
+        <div className="flex items-center justify-between text-[12px]">
+          <div className="text-white/50 font-mono">{h.at} · {fmtDuration(h.duration)}</div>
+          <div className="font-num text-white">
+            ${fmtUSD(h.final, 2)} <span className="text-white/40 text-[10.5px]">{h.token}</span>
+          </div>
+        </div>
+        <div>
+          <a href="#" className="inline-flex items-center gap-1 font-mono text-[11px] text-violet-300/70 hover:text-white">
+            {h.tx} <Icon name="arrow-up-right" size={10} />
+          </a>
         </div>
       </div>
-      <div className="col-span-2 text-right font-num text-white">${fmtUSD(h.final, 2)} <span className="text-white/40 text-[11px]">{h.token}</span></div>
-      <div className="col-span-2 text-white/65 font-mono text-[12px]">Streamed for {fmtDuration(h.duration)}</div>
-      <div className="col-span-2 text-white/55 font-mono text-[12px]">{h.at}</div>
-      <div className="col-span-2 text-right">
-        <a href="#" className="inline-flex items-center gap-1 font-mono text-[11.5px] text-violet-300/80 hover:text-white">
-          {h.tx} <Icon name="arrow-up-right" size={11} />
-        </a>
+      {/* Desktop grid row */}
+      <div className="hidden sm:grid grid-cols-12 gap-2 px-6 py-4 text-[13px] border-b border-white/5 hover:bg-white/[0.02] items-center">
+        <div className="col-span-1">{badge}</div>
+        <div className="col-span-3 flex items-center gap-3 min-w-0">
+          <SolAvatar seed={h.party} size={28} />
+          <div className="min-w-0">
+            <div className="text-white truncate">{h.party}</div>
+            <div className="text-[10.5px] font-mono text-white/40">{h.id}</div>
+          </div>
+        </div>
+        <div className="col-span-2 text-right font-num text-white">${fmtUSD(h.final, 2)} <span className="text-white/40 text-[11px]">{h.token}</span></div>
+        <div className="col-span-2 text-white/65 font-mono text-[12px]">Streamed for {fmtDuration(h.duration)}</div>
+        <div className="col-span-2 text-white/55 font-mono text-[12px]">{h.at}</div>
+        <div className="col-span-2 text-right">
+          <a href="#" className="inline-flex items-center gap-1 font-mono text-[11.5px] text-violet-300/80 hover:text-white">
+            {h.tx} <Icon name="arrow-up-right" size={11} />
+          </a>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -1493,6 +1521,7 @@ function NewStreamDrawer({ open, onClose, onCreate, walletConnected, onConnectWa
   const [token, setToken] = useState("SOL");
   const [amount, setAmount] = useState(0.1);
   const [period, setPeriod] = useState(NEW_STREAM_DEFAULTS.period);
+  const [periodCount, setPeriodCount] = useState(1);
   const [label, setLabel] = useState(NEW_STREAM_DEFAULTS.label);
   const [deposit, setDeposit] = useState(1.0);
   const [policy, setPolicy] = useState(NEW_STREAM_DEFAULTS.policy);
@@ -1514,7 +1543,9 @@ function NewStreamDrawer({ open, onClose, onCreate, walletConnected, onConnectWa
     }
   }, [open, prefill]);
 
-  const periodSec = NEW_STREAM_DEFAULTS.periodSeconds[period] ?? 86400;
+  const PERIOD_MAX: Record<string, number> = { hour: 23, day: 30, week: 4, month: 12 };
+  const periodBaseSec = NEW_STREAM_DEFAULTS.periodSeconds[period] ?? 86400;
+  const periodSec = periodBaseSec * periodCount;
   const perSec = amount / periodSec;
   const perDay = perSec * 86400;
   const perHour = perSec * 3600;
@@ -1619,35 +1650,65 @@ function NewStreamDrawer({ open, onClose, onCreate, walletConnected, onConnectWa
 
             {/* Smart Rate Converter */}
             <Field label="Smart rate converter" hint="SOL amount per period.">
-              <div className="flex items-stretch gap-2">
-                <div className="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/8 focus-within:border-violet-400/40 transition">
-                  <span className="text-white/40 text-[20px] font-num">◎</span>
-                  <input
-                    type="number"
-                    min={0}
-                    step={0.001}
-                    value={amount}
-                    onChange={(e) => setAmount(Math.max(0, Number(e.target.value) || 0))}
-                    className="flex-1 bg-transparent outline-none text-[22px] font-num text-iri num-stable"
-                  />
-                </div>
-                <div className="flex items-center px-1 rounded-xl bg-white/[0.03] border border-white/8">
-                  {["hour", "day", "week", "month"].map((p) => (
-                    <button key={p} onClick={() => setPeriod(p)} className={`px-2.5 py-1.5 text-[11.5px] font-mono uppercase rounded-lg transition ${period === p ? "bg-violet-400/15 text-violet-200" : "text-white/55 hover:text-white"}`}>
-                      / {p.slice(0, 3)}
-                    </button>
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/8 focus-within:border-violet-400/40 transition">
+                <span className="text-white/40 text-[20px] font-num">◎</span>
+                <input
+                  type="number"
+                  min={0}
+                  step={0.001}
+                  value={amount}
+                  onChange={(e) => setAmount(Math.max(0, Number(e.target.value) || 0))}
+                  className="flex-1 bg-transparent outline-none text-[22px] font-num text-iri num-stable"
+                />
+              </div>
+              <div className="mt-2 flex items-center gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/8">
+                {[
+                  { k: "hour",  label: "/ Hour" },
+                  { k: "day",   label: "/ Day" },
+                  { k: "week",  label: "/ Week" },
+                  { k: "month", label: "/ Month" },
+                ].map((p) => (
+                  <button
+                    key={p.k}
+                    onClick={() => { setPeriod(p.k); setPeriodCount(1); }}
+                    className={`flex-1 py-1.5 text-[11.5px] font-mono rounded-lg transition ${period === p.k ? "bg-violet-400/15 text-violet-200" : "text-white/55 hover:text-white"}`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              {/* Count selector */}
+              <div className="mt-1.5 flex items-center gap-1.5">
+                <button
+                  onClick={() => setPeriodCount(c => Math.max(1, c - 1))}
+                  className="w-7 h-7 rounded-lg border border-white/10 text-white/55 hover:text-white hover:border-violet-400/30 flex items-center justify-center text-[14px] font-mono shrink-0"
+                >−</button>
+                <div className="flex-1 flex items-center gap-1 overflow-x-auto scrollbar-none py-0.5">
+                  {Array.from({ length: PERIOD_MAX[period] }, (_, i) => i + 1).map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => setPeriodCount(n)}
+                      className={`shrink-0 min-w-[26px] h-7 rounded-lg text-[11px] font-mono transition border ${periodCount === n ? "bg-violet-400/20 border-violet-400/40 text-violet-200" : "border-transparent text-white/40 hover:text-white hover:border-white/15"}`}
+                    >{n}</button>
                   ))}
                 </div>
+                <button
+                  onClick={() => setPeriodCount(c => Math.min(PERIOD_MAX[period], c + 1))}
+                  className="w-7 h-7 rounded-lg border border-white/10 text-white/55 hover:text-white hover:border-violet-400/30 flex items-center justify-center text-[14px] font-mono shrink-0"
+                >+</button>
+              </div>
+              <div className="mt-1 text-[11px] font-mono text-white/35">
+                = {periodCount} {period}{periodCount > 1 ? "s" : ""} per cycle
               </div>
             </Field>
 
             <div className="rounded-2xl border border-violet-400/20 bg-violet-400/5 p-4">
               <div className="text-[10.5px] uppercase tracking-[0.18em] text-violet-200/80 font-mono">Auto-converted flow rate</div>
-              <div className="mt-3 grid grid-cols-4 gap-2">
-                <BreakdownCell label="/sec"  value={`◎${perSec.toFixed(7)}`} accent />
-                <BreakdownCell label="/min"  value={`◎${perMin.toFixed(4)}`} />
-                <BreakdownCell label="/hr"   value={`◎${perHour.toFixed(2)}`} />
-                <BreakdownCell label="/day"  value={`◎${perDay.toFixed(2)}`} />
+              <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <BreakdownCell label="/sec"  value={perSec.toFixed(7)} accent />
+                <BreakdownCell label="/min"  value={perMin.toFixed(4)} />
+                <BreakdownCell label="/hr"   value={perHour.toFixed(2)} />
+                <BreakdownCell label="/day"  value={perDay.toFixed(2)} />
               </div>
               <div className="mt-3 text-[11.5px] font-mono text-white/45">
                 Settles every <span className="text-violet-200">{PROTOCOL_STATS.blockTime}</span> on Solana · receiver can withdraw mid-stream
@@ -1817,10 +1878,14 @@ function Field({ label, hint, children }: any) {
 }
 
 function BreakdownCell({ label, value, accent }: any) {
+  // Strip leading ◎ symbol so we render it as a separate span with proper fallback font
+  const numStr = typeof value === "string" ? value.replace(/^[◎©◉⊙○●]/u, "") : value;
   return (
-    <div className={`rounded-lg px-3 py-2 border ${accent ? "border-violet-400/40 bg-violet-400/10" : "border-white/8 bg-white/[0.03]"}`}>
-      <div className="text-[10px] uppercase tracking-[0.16em] text-white/40 font-mono">{label}</div>
-      <div className={`mt-1 font-num num-stable ${accent ? "text-iri text-[14px]" : "text-white/85 text-[13px]"}`}>{value}</div>
+    <div className={`rounded-lg px-2.5 py-2 border overflow-hidden ${accent ? "border-violet-400/40 bg-violet-400/10" : "border-white/8 bg-white/[0.03]"}`}>
+      <div className="text-[9.5px] uppercase tracking-[0.14em] text-white/40 font-mono">{label}</div>
+      <div className={`mt-1 font-num num-stable break-all leading-tight ${accent ? "text-iri text-[12px]" : "text-white/85 text-[11.5px]"}`}>
+        <span className="text-white/50 not-italic">◎</span>{numStr}
+      </div>
     </div>
   );
 }
