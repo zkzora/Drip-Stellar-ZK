@@ -1,6 +1,7 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { GlowCard } from "@/components/ui/spotlight-card";
 import { Icon } from "@/components/ui/Icon";
 import {
   CALCULATOR_DEMO,
@@ -56,20 +57,191 @@ function useStreamingValue(initial, ratePerSec, running = true) {
   return v;
 }
 
+// ── useInView hook ────────────────────────────────────────────────────────
+function useInView(threshold = 0.15) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect(); } },
+      { threshold },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [threshold]);
+  return { ref, visible };
+}
+
+// ── Scroll parallax ───────────────────────────────────────────────────────
+function useScrollY() {
+  const [y, setY] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    const fn = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => setY(window.scrollY));
+    };
+    window.addEventListener("scroll", fn, { passive: true });
+    return () => { window.removeEventListener("scroll", fn); cancelAnimationFrame(raf); };
+  }, []);
+  return y;
+}
+
+// ── Particles ─────────────────────────────────────────────────────────────
+const PARTICLES = [
+  { l:"7%",  t:"11%", s:1.5, d:"7s",  e:"0s",   c:"#A07FF8" },
+  { l:"21%", t:"30%", s:1,   d:"10s", e:"1.3s", c:"#A07FF8" },
+  { l:"37%", t:"6%",  s:2,   d:"8s",  e:"0.5s", c:"#22D3EE" },
+  { l:"54%", t:"19%", s:1.5, d:"12s", e:"2.1s", c:"#A07FF8" },
+  { l:"68%", t:"33%", s:1,   d:"9s",  e:"0.8s", c:"#22D3EE" },
+  { l:"83%", t:"13%", s:2,   d:"14s", e:"1.8s", c:"#A07FF8" },
+  { l:"12%", t:"61%", s:1.5, d:"11s", e:"3.0s", c:"#A07FF8" },
+  { l:"29%", t:"74%", s:1,   d:"7s",  e:"2.5s", c:"#22D3EE" },
+  { l:"46%", t:"56%", s:2,   d:"9s",  e:"1.0s", c:"#A07FF8" },
+  { l:"63%", t:"69%", s:1,   d:"13s", e:"4.0s", c:"#A07FF8" },
+  { l:"78%", t:"81%", s:1.5, d:"8s",  e:"0.3s", c:"#22D3EE" },
+  { l:"90%", t:"44%", s:1,   d:"15s", e:"5.0s", c:"#A07FF8" },
+  { l:"4%",  t:"87%", s:2,   d:"10s", e:"2.8s", c:"#A07FF8" },
+  { l:"42%", t:"93%", s:1.5, d:"6s",  e:"1.5s", c:"#22D3EE" },
+  { l:"75%", t:"51%", s:1,   d:"11s", e:"3.6s", c:"#A07FF8" },
+  { l:"17%", t:"43%", s:1,   d:"8s",  e:"0.2s", c:"#22D3EE" },
+  { l:"59%", t:"89%", s:1.5, d:"13s", e:"6.0s", c:"#A07FF8" },
+];
+
+function BackdropParticles() {
+  return (
+    <>
+      {PARTICLES.map((p, i) => (
+        <div
+          key={i}
+          className="absolute rounded-full pointer-events-none"
+          style={{
+            left: p.l, top: p.t,
+            width: `${p.s}px`, height: `${p.s}px`,
+            background: p.c,
+            boxShadow: `0 0 ${p.s * 5}px ${p.c}80`,
+            animation: `twinkle ${p.d} ease-in-out infinite ${p.e}`,
+          }}
+        />
+      ))}
+    </>
+  );
+}
+
+function BackdropStreaks() {
+  return (
+    <>
+      {[
+        { top: "19%", w: "190px", h: "1.5px", col: "rgba(160,127,248,0.7)", dur: "10s", del: "0s"  },
+        { top: "44%", w: "130px", h: "1px",   col: "rgba(34,211,238,0.5)",  dur: "17s", del: "5s"  },
+        { top: "71%", w: "95px",  h: "0.8px", col: "rgba(182,154,255,0.4)", dur: "23s", del: "9s"  },
+      ].map((s, i) => (
+        <div
+          key={i}
+          className="absolute pointer-events-none"
+          style={{
+            top: s.top, left: 0,
+            width: s.w, height: s.h,
+            background: `linear-gradient(90deg, transparent, ${s.col}, transparent)`,
+            animation: `lightStreak ${s.dur} linear infinite ${s.del}`,
+          }}
+        />
+      ))}
+    </>
+  );
+}
+
+function BackdropStreamLines() {
+  return (
+    <svg
+      aria-hidden
+      className="pointer-events-none absolute inset-0 w-full h-full"
+      viewBox="0 0 1440 900"
+      preserveAspectRatio="xMidYMid slice"
+      fill="none"
+    >
+      <defs>
+        <linearGradient id="sgA" x1="0%" x2="100%">
+          <stop offset="0%"   stopColor="#8144EE" stopOpacity="0" />
+          <stop offset="30%"  stopColor="#A07FF8" stopOpacity="0.32" />
+          <stop offset="70%"  stopColor="#B69AFF" stopOpacity="0.24" />
+          <stop offset="100%" stopColor="#22D3EE" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id="sgB" x1="0%" x2="100%">
+          <stop offset="0%"   stopColor="#22D3EE" stopOpacity="0" />
+          <stop offset="45%"  stopColor="#22D3EE" stopOpacity="0.18" />
+          <stop offset="90%"  stopColor="#A07FF8" stopOpacity="0.14" />
+          <stop offset="100%" stopColor="#8144EE" stopOpacity="0" />
+        </linearGradient>
+        <filter id="sfg">
+          <feGaussianBlur stdDeviation="2.5" result="b" />
+          <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+      </defs>
+      {/* Primary stream — sweeps through hero zone */}
+      <path
+        d="M -200 280 C 200 220, 480 360, 780 270 S 1160 140, 1700 290"
+        stroke="url(#sgA)" strokeWidth="1.5" strokeDasharray="10 20"
+        filter="url(#sfg)"
+        style={{ animation: "streamFlow 16s linear infinite" }}
+      />
+      {/* Mid stream */}
+      <path
+        d="M -100 500 C 300 430, 600 560, 960 470 S 1320 360, 1750 480"
+        stroke="url(#sgB)" strokeWidth="1" strokeDasharray="6 24"
+        style={{ animation: "streamFlow 24s linear infinite reverse" }}
+      />
+      {/* Lower accent */}
+      <path
+        d="M 300 720 C 580 670, 860 750, 1160 690 S 1460 630, 1700 710"
+        stroke="url(#sgA)" strokeWidth="0.7" strokeDasharray="4 30"
+        opacity="0.4"
+        style={{ animation: "streamFlow 32s linear infinite" }}
+      />
+    </svg>
+  );
+}
+
 // =========================================================================
 // Atmospheric background
 // =========================================================================
 function Backdrop() {
+  const sy = useScrollY();
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
       <div className="absolute inset-0 bg-grid opacity-60" />
       <div className="absolute inset-0 bg-noise" />
-      {/* Top hero glow */}
-      <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[1100px] h-[700px] glow-orb opacity-80" />
-      <div className="absolute top-[8%] right-[10%] w-[420px] h-[420px] iri-orb rounded-full opacity-50 drift-slow" />
-      <div className="absolute top-[40%] left-[-6%] w-[360px] h-[360px] iri-orb rounded-full opacity-30 drift-med" />
-      {/* Bottom subtle */}
-      <div className="absolute bottom-[-200px] left-1/2 -translate-x-1/2 w-[900px] h-[400px] glow-orb opacity-30" />
+
+      {/* Aurora orbs — parallax on scroll */}
+      <div
+        className="absolute -top-40 left-1/2 w-[1100px] h-[700px] glow-orb opacity-75 aurora-1"
+        style={{ transform: `translateX(-50%) translateY(${sy * 0.12}px)` }}
+      />
+      <div
+        className="absolute top-[8%] right-[10%] w-[480px] h-[480px] iri-orb rounded-full opacity-40 aurora-2"
+        style={{ transform: `translateY(${sy * 0.06}px)` }}
+      />
+      <div
+        className="absolute top-[40%] left-[-6%] w-[400px] h-[400px] iri-orb rounded-full opacity-24 aurora-3"
+        style={{ transform: `translateY(${sy * -0.05}px)` }}
+      />
+      <div
+        className="absolute bottom-[-80px] right-[18%] w-[320px] h-[320px] glow-orb opacity-[0.16] aurora-2"
+        style={{ transform: `translateY(${sy * -0.08}px)` }}
+      />
+      <div className="absolute bottom-[-200px] left-1/2 -translate-x-1/2 w-[900px] h-[400px] glow-orb opacity-25" />
+
+      {/* Flowing stream lines */}
+      <BackdropStreamLines />
+
+      {/* Diagonal light streaks */}
+      <BackdropStreaks />
+
+      {/* Sparse floating particles */}
+      <BackdropParticles />
+
       {/* Vignette */}
       <div className="absolute inset-0" style={{ background: "radial-gradient(80% 60% at 50% 0%, transparent 40%, rgba(0,0,0,0.7) 100%)" }} />
     </div>
@@ -171,7 +343,8 @@ function Hero() {
     <section className="relative pt-16 pb-28">
       <div className="max-w-[1240px] mx-auto px-6 grid lg:grid-cols-12 gap-10 items-start">
         <div className="lg:col-span-7 pt-8">
-          <div className="inline-flex items-center gap-2 rounded-full border border-violet-400/25 bg-violet-400/5 px-3 py-1.5 text-[12px] text-violet-200/90 mb-7">
+          {/* Badge */}
+          <div className="anim-fade-down delay-0 inline-flex items-center gap-2 rounded-full border border-violet-400/25 bg-violet-400/5 px-3 py-1.5 text-[12px] text-violet-200/90 mb-7">
             <span className="relative flex h-1.5 w-1.5">
               <span className="absolute inline-flex h-full w-full rounded-full bg-violet-300 opacity-75 animate-ping" />
               <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-violet-300" />
@@ -181,14 +354,18 @@ function Hero() {
             <span>2026 cohort</span>
           </div>
 
-          <h1 className="text-[38px] sm:text-[52px] lg:text-[68px] leading-[1.02] font-medium tracking-[-0.025em] text-iri">
+          {/* Headline */}
+          <h1 className="anim-fade-up delay-80 text-[38px] sm:text-[52px] lg:text-[68px] leading-[1.02] font-medium tracking-[-0.025em] text-iri-anim">
             Programmable Cashflow<br />for AI Agents.
           </h1>
-          <p className="mt-6 text-[15px] sm:text-[18.5px] text-white/65 leading-[1.55] max-w-[580px]">
+
+          {/* Subtitle */}
+          <p className="anim-fade-up delay-160 mt-6 text-[15px] sm:text-[18.5px] text-white/65 leading-[1.55] max-w-[580px]">
             Drip is the first streaming payment protocol built for the autonomous agent economy. Set spending policies, stream funds per-second, and automate compliance on Solana.
           </p>
 
-          <div className="mt-9 flex flex-wrap items-center gap-3">
+          {/* CTAs */}
+          <div className="anim-fade-up delay-240 mt-9 flex flex-wrap items-center gap-3">
             <a href="/dashboard" className="btn-primary rounded-full px-5 py-3 text-[14px] font-medium text-white flex items-center gap-2">
               <Icon name="zap" size={15} /> Launch App
             </a>
@@ -201,14 +378,15 @@ function Hero() {
           </div>
 
           {/* Stats strip */}
-          <div className="mt-10 grid grid-cols-3 gap-4 sm:gap-6 max-w-[520px]">
-            {LANDING_PROTOCOL_STATS.map((stat) => (
+          <div className="anim-fade-up delay-320 mt-10 grid grid-cols-3 gap-4 sm:gap-6 max-w-[520px]">
+            {LANDING_PROTOCOL_STATS.map((stat, i) => (
               <Stat key={stat.label} label={stat.label} value={stat.value} hint={stat.hint} />
             ))}
           </div>
         </div>
 
-        <div className="hidden lg:block lg:col-span-5 lg:pl-4">
+        {/* Streaming card */}
+        <div className="hidden lg:block lg:col-span-5 lg:pl-4 anim-fade-left delay-400">
           <StreamingCard />
         </div>
       </div>
@@ -380,13 +558,14 @@ function FlowGraphic() {
 // Marquee / Logos strip
 // =========================================================================
 function PartnersStrip() {
+  const { ref, visible } = useInView(0.1);
   return (
-    <section className="border-y border-white/5 py-7 mt-2">
-      <div className="max-w-[1240px] mx-auto px-6 flex items-center gap-10 flex-wrap">
+    <section ref={ref} className="border-y border-white/5 py-7 mt-2">
+      <div className={`max-w-[1240px] mx-auto px-6 flex items-center gap-10 flex-wrap reveal ${visible ? "in-view" : ""}`}>
         <div className="text-[11px] uppercase tracking-[0.22em] text-white/35 font-mono">Built with</div>
-        <div className="flex items-center gap-9 flex-wrap">
+        <div className={`flex items-center gap-9 flex-wrap stagger-children ${visible ? "in-view" : ""}`}>
           {LANDING_PARTNERS.map((it) => (
-            <span key={it} className="text-white/45 hover:text-white/80 transition text-[15px] font-medium tracking-tight">
+            <span key={it} className="reveal text-white/45 hover:text-white/80 transition text-[15px] font-medium tracking-tight">
               {it}
             </span>
           ))}
@@ -400,30 +579,43 @@ function PartnersStrip() {
 // Why Drip  -  old vs new + 3 pillars
 // =========================================================================
 function WhyDrip() {
+  const header = useInView(0.1);
+  const panels = useInView(0.1);
+  const pillars = useInView(0.1);
   return (
     <section id="why-drip" className="relative py-16 sm:py-28">
+      {/* Subtle data-grid ornament */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute inset-0 bg-grid opacity-[0.022]" style={{ backgroundSize: "28px 28px" }} />
+      </div>
       <div className="max-w-[1240px] mx-auto px-6">
-        <SectionHeader
-          eyebrow="01  -  Why Drip"
-          title={<>Salary is paid monthly.<br /><span className="text-white/40">Value is created by the second.</span></>}
-          sub="The lump-sum payment model is a relic of paper checks. Drip fixes the temporal mismatch between work and money."
-        />
+        <div ref={header.ref} className={`reveal ${header.visible ? "in-view" : ""}`}>
+          <SectionHeader
+            eyebrow="01  -  Why Drip"
+            title={<>Salary is paid monthly.<br /><span className="text-white/40">Value is created by the second.</span></>}
+            sub="The lump-sum payment model is a relic of paper checks. Drip fixes the temporal mismatch between work and money."
+          />
+        </div>
 
-        <div className="mt-14 grid lg:grid-cols-2 gap-5">
+        <div ref={panels.ref} className={`mt-14 grid lg:grid-cols-2 gap-5 stagger-children ${panels.visible ? "in-view" : ""}`}>
           {DRIP_COMPARE_PANELS.map((panel) => (
-            <ComparePanel key={panel.kind} {...panel} />
+            <div key={panel.kind} className="reveal">
+              <ComparePanel {...panel} />
+            </div>
           ))}
         </div>
 
         {/* 3 Pillars */}
         <div className="mt-20">
-          <div className="flex items-end justify-between mb-7">
+          <div ref={pillars.ref} className={`flex items-end justify-between mb-7 reveal ${pillars.visible ? "in-view" : ""}`}>
             <h3 className="text-[28px] tracking-tight font-medium">Three pillars holding it up.</h3>
             <a href="#" className="text-[13px] text-white/55 hover:text-white flex items-center gap-1">Read the litepaper <Icon name="arrow-up-right" size={13} /></a>
           </div>
-          <div className="grid md:grid-cols-3 gap-5">
+          <div className={`grid md:grid-cols-3 gap-5 stagger-children ${pillars.visible ? "in-view" : ""}`}>
             {DRIP_PILLARS.map((pillar) => (
-              <Pillar key={pillar.title} {...pillar} />
+              <div key={pillar.title} className="reveal">
+                <Pillar {...pillar} />
+              </div>
             ))}
           </div>
         </div>
@@ -469,19 +661,25 @@ function ComparePanel({ kind, title, label, timeline, footer }: any) {
 
 function Pillar({ n, title, body, icon, meta, highlight }: any) {
   return (
-    <div className={`relative rounded-2xl p-6 ${highlight ? "grad-border glass-strong" : "glass"} hover:translate-y-[-2px] transition-transform duration-300`}>
-      <div className="flex items-center justify-between">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${highlight ? "bg-violet-400/15 text-violet-200" : "bg-white/5 text-white/70"}`}>
-          <Icon name={icon} size={18} />
+    <GlowCard
+      glowColor={highlight ? "purple" : "blue"}
+      customSize
+      className={`p-6 hover:translate-y-[-2px] transition-transform duration-300 w-full h-full ${highlight ? "glass-strong" : "glass"}`}
+    >
+      <div className="relative z-10 flex flex-col h-full">
+        <div className="flex items-center justify-between">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${highlight ? "bg-violet-400/15 text-violet-200" : "bg-white/5 text-white/70"}`}>
+            <Icon name={icon} size={18} />
+          </div>
+          <span className="font-serif italic text-white/30 text-[28px] leading-none">{n}</span>
         </div>
-        <span className="font-serif italic text-white/30 text-[28px] leading-none">{n}</span>
+        <h4 className="mt-5 text-[20px] font-medium tracking-tight">{title}</h4>
+        <p className="mt-2.5 text-[14px] text-white/60 leading-[1.55]">{body}</p>
+        <div className="mt-auto pt-6 border-t border-white/5 text-[11px] uppercase tracking-[0.16em] text-white/40 font-mono">
+          {meta}
+        </div>
       </div>
-      <h4 className="mt-5 text-[20px] font-medium tracking-tight">{title}</h4>
-      <p className="mt-2.5 text-[14px] text-white/60 leading-[1.55]">{body}</p>
-      <div className="mt-6 pt-4 border-t border-white/5 text-[11px] uppercase tracking-[0.16em] text-white/40 font-mono">
-        {meta}
-      </div>
-    </div>
+    </GlowCard>
   );
 }
 
@@ -501,23 +699,28 @@ function SectionHeader({ eyebrow, title, sub }: any) {
 function UseCases() {
   const [active, setActive] = useState(0);
   const c = LANDING_USE_CASES[active];
+  const header = useInView(0.1);
+  const tabs = useInView(0.1);
+  const detail = useInView(0.1);
 
   return (
     <section id="use-cases" className="relative py-16 sm:py-28">
       <div className="max-w-[1240px] mx-auto px-6">
-        <SectionHeader
-          eyebrow="02  -  Use cases"
-          title={<>Three economies. <span className="text-white/40">One protocol.</span></>}
-          sub="Drip is a primitive  -  anywhere money should match the cadence of work, attention, or compute, it fits."
-        />
+        <div ref={header.ref} className={`reveal ${header.visible ? "in-view" : ""}`}>
+          <SectionHeader
+            eyebrow="02  -  Use cases"
+            title={<>Three economies. <span className="text-white/40">One protocol.</span></>}
+            sub="Drip is a primitive  -  anywhere money should match the cadence of work, attention, or compute, it fits."
+          />
+        </div>
 
         {/* Tabs */}
-        <div className="mt-12 grid md:grid-cols-3 gap-3">
+        <div ref={tabs.ref} className={`mt-12 grid md:grid-cols-3 gap-3 stagger-children ${tabs.visible ? "in-view" : ""}`}>
           {LANDING_USE_CASES.map((cc, i) => (
             <button
               key={cc.key}
               onClick={() => setActive(i)}
-              className={`text-left rounded-2xl px-5 py-5 border transition ${active === i ? "tab-active" : "border-white/8 hover:border-white/20 bg-white/[0.02]"}`}
+              className={`reveal text-left rounded-2xl px-5 py-5 border transition ${active === i ? "tab-active" : "border-white/8 hover:border-white/20 bg-white/[0.02]"}`}
             >
               <div className="flex items-center justify-between">
                 <span className="tab-num font-mono text-[11px] tracking-[0.2em] text-white/40 uppercase">{String(i + 1).padStart(2, "0")} · {cc.tag}</span>
@@ -529,7 +732,7 @@ function UseCases() {
         </div>
 
         {/* Detail panel */}
-        <div className="mt-6 grid lg:grid-cols-12 gap-6">
+        <div ref={detail.ref} className={`mt-6 grid lg:grid-cols-12 gap-6 reveal ${detail.visible ? "in-view" : ""}`}>
           <div className="lg:col-span-5 rounded-3xl glass p-6 sm:p-8">
             <div className="text-[11px] font-mono uppercase tracking-[0.2em] text-violet-300/70">{c.tag}</div>
             <h3 className="mt-3 text-[34px] leading-[1.1] font-medium tracking-[-0.02em] text-iri">{c.title}</h3>
@@ -687,7 +890,7 @@ function DemoAgents() {
         </div>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-white/5 bg-white/[0.02] p-3 flex-1 overflow-hidden">
+      <div className="mt-6 rounded-2xl border border-white/5 bg-white/[0.02] p-3 flex-1 overflow-hidden scanlines">
         <div className="flex items-center justify-between px-2 py-1.5">
           <span className="text-[10.5px] uppercase tracking-[0.2em] text-white/40 font-mono">Settlement log</span>
           <span className="text-[9.5px] font-mono text-amber-300/60 uppercase tracking-[0.14em]">demo simulation</span>
@@ -706,7 +909,10 @@ function DemoAgents() {
             );
           })}
         </div>
-        <div className="mt-2 px-2 text-[11px] font-mono text-white/35">{LANDING_AGENT_DEMO.streamId} · {tick + 1} settlements ledgered</div>
+        <div className="mt-2 px-2 text-[11px] font-mono text-white/35 flex items-center gap-1">
+          <span>{LANDING_AGENT_DEMO.streamId} · {tick + 1} settlements ledgered</span>
+          <span className="cursor-blink text-violet-400/70 ml-0.5">▮</span>
+        </div>
       </div>
 
       <div className="mt-5 grid grid-cols-3 gap-3 text-[12px]">
@@ -731,16 +937,26 @@ function MiniStat({ label, value }: any) {
 // Developer experience + Calculator
 // =========================================================================
 function Developers() {
+  const header = useInView(0.1);
+  const code = useInView(0.1);
+  const features = useInView(0.1);
+
   return (
     <section id="developers" className="relative py-16 sm:py-28">
+      {/* Data-grid ornament */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute inset-0 bg-grid opacity-[0.018]" style={{ backgroundSize: "32px 32px" }} />
+      </div>
       <div className="max-w-[1240px] mx-auto px-6">
-        <SectionHeader
-          eyebrow="03  -  Developer experience"
-          title={<>Three lines to a live stream.</>}
-          sub="The Drip Anchor program is live on devnet. Interact directly with the IDL today, or wait for the planned drip-sol SDK."
-        />
+        <div ref={header.ref} className={`reveal ${header.visible ? "in-view" : ""}`}>
+          <SectionHeader
+            eyebrow="03  -  Developer experience"
+            title={<>Three lines to a live stream.</>}
+            sub="The Drip Anchor program is live on devnet. Interact directly with the IDL today, or wait for the planned drip-sol SDK."
+          />
+        </div>
 
-        <div className="mt-12 grid lg:grid-cols-12 gap-6">
+        <div ref={code.ref} className={`mt-12 grid lg:grid-cols-12 gap-6 reveal ${code.visible ? "in-view" : ""}`}>
           <div className="lg:col-span-7 min-w-0 overflow-hidden">
             <CodeBlock />
           </div>
@@ -749,9 +965,11 @@ function Developers() {
           </div>
         </div>
 
-        <div className="mt-6 grid md:grid-cols-3 gap-4">
+        <div ref={features.ref} className={`mt-6 grid md:grid-cols-3 gap-4 stagger-children ${features.visible ? "in-view" : ""}`}>
           {DEV_FEATURES.map((feature) => (
-            <DevFeature key={feature.title} {...feature} />
+            <div key={feature.title} className="reveal">
+              <DevFeature {...feature} />
+            </div>
           ))}
         </div>
       </div>
@@ -786,13 +1004,15 @@ function CodeBlockHL({ html }: any) { return <pre className="codeblock p-6 m-0 t
 
 function DevFeature({ icon, title, desc }: any) {
   return (
-    <div className="rounded-2xl glass p-5">
-      <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center text-violet-200"><Icon name={icon} size={16} /></div>
-        <div className="text-[14.5px] text-white">{title}</div>
+    <GlowCard customSize glowColor="purple" className="p-5 glass w-full h-full hover:translate-y-[-2px] transition-transform duration-300">
+      <div className="relative z-10">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center text-violet-200"><Icon name={icon} size={16} /></div>
+          <div className="text-[14.5px] text-white">{title}</div>
+        </div>
+        <div className="mt-3 text-[13px] text-white/55 leading-[1.55]">{desc}</div>
       </div>
-      <div className="mt-3 text-[13px] text-white/55 leading-[1.55]">{desc}</div>
-    </div>
+    </GlowCard>
   );
 }
 
@@ -880,27 +1100,42 @@ function CalcRow({ label, value, accent }: any) {
 // =========================================================================
 // Ecosystem strip
 // =========================================================================
+function EcosystemCard({ p }: any) {
+  return (
+    <GlowCard customSize glowColor="blue" className="p-6 glass w-full h-full group hover:translate-y-[-2px] transition-transform duration-300">
+      <div className="relative z-10 flex flex-col h-full">
+        <div className="flex items-center justify-between">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-400/20 to-fuchsia-400/20 border border-violet-400/20 flex items-center justify-center text-violet-200">
+            <Icon name={p.icon} size={18} />
+          </div>
+          <span className="text-[10.5px] uppercase tracking-[0.18em] text-white/35 font-mono">Partner</span>
+        </div>
+        <div className="mt-5 text-[20px] tracking-tight text-white">{p.name}</div>
+        <div className="text-[12.5px] text-white/45 font-mono mt-0.5">{p.role}</div>
+        <div className="mt-5 pt-4 border-t border-white/5 text-[12px] text-white/55">{p.note}</div>
+      </div>
+    </GlowCard>
+  );
+}
+
 function Ecosystem() {
+  const header = useInView(0.1);
+  const cards = useInView(0.1);
+
   return (
     <section id="ecosystem" className="relative py-24">
       <div className="max-w-[1240px] mx-auto px-6">
-        <SectionHeader
-          eyebrow="04  -  Trust & ecosystem"
-          title={<>The pipes underneath.</>}
-          sub="Drip composes with the best of Solana  -  payment, custody, and on-ramp. Yield routing via Raydium is on the roadmap."
-        />
-        <div className="mt-12 grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div ref={header.ref} className={`reveal ${header.visible ? "in-view" : ""}`}>
+          <SectionHeader
+            eyebrow="04  -  Trust & ecosystem"
+            title={<>The pipes underneath.</>}
+            sub="Drip composes with the best of Solana  -  payment, custody, and on-ramp. Yield routing via Raydium is on the roadmap."
+          />
+        </div>
+        <div ref={cards.ref} className={`mt-12 grid md:grid-cols-2 lg:grid-cols-4 gap-4 stagger-children ${cards.visible ? "in-view" : ""}`}>
           {ECOSYSTEM_PARTNERS.map((p) => (
-            <div key={p.name} className="rounded-2xl glass p-6 group hover:border-violet-400/30 transition">
-              <div className="flex items-center justify-between">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-400/20 to-fuchsia-400/20 border border-violet-400/20 flex items-center justify-center text-violet-200">
-                  <Icon name={p.icon} size={18} />
-                </div>
-                <span className="text-[10.5px] uppercase tracking-[0.18em] text-white/35 font-mono">Partner</span>
-              </div>
-              <div className="mt-5 text-[20px] tracking-tight text-white">{p.name}</div>
-              <div className="text-[12.5px] text-white/45 font-mono mt-0.5">{p.role}</div>
-              <div className="mt-5 pt-4 border-t border-white/5 text-[12px] text-white/55">{p.note}</div>
+            <div key={p.name} className="reveal">
+              <EcosystemCard p={p} />
             </div>
           ))}
         </div>
@@ -913,9 +1148,10 @@ function Ecosystem() {
 // CTA + Footer
 // =========================================================================
 function FinalCTA() {
+  const { ref, visible } = useInView(0.1);
   return (
     <section className="relative py-24">
-      <div className="max-w-[1240px] mx-auto px-6">
+      <div ref={ref} className={`max-w-[1240px] mx-auto px-6 reveal ${visible ? "in-view" : ""}`}>
         <div className="relative rounded-[32px] grad-border glass-strong p-1.5 overflow-hidden">
           <div className="rounded-[28px] bg-gradient-to-br from-[#0e0c25] to-[#07060f] px-6 py-12 sm:p-14 relative overflow-hidden">
             <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-[600px] h-[400px] glow-orb opacity-50" />
