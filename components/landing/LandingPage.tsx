@@ -75,40 +75,16 @@ function useInView(threshold = 0.15) {
   return { ref, visible };
 }
 
-// ── Scroll parallax ───────────────────────────────────────────────────────
-function useScrollY() {
-  const [y, setY] = useState(0);
-  useEffect(() => {
-    let raf = 0;
-    const fn = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => setY(window.scrollY));
-    };
-    window.addEventListener("scroll", fn, { passive: true });
-    return () => { window.removeEventListener("scroll", fn); cancelAnimationFrame(raf); };
-  }, []);
-  return y;
-}
-
-// ── Particles ─────────────────────────────────────────────────────────────
+// ── Particles (8 only, no boxShadow, GPU-composited) ──────────────────────
 const PARTICLES = [
   { l:"7%",  t:"11%", s:1.5, d:"7s",  e:"0s",   c:"#A07FF8" },
-  { l:"21%", t:"30%", s:1,   d:"10s", e:"1.3s", c:"#A07FF8" },
   { l:"37%", t:"6%",  s:2,   d:"8s",  e:"0.5s", c:"#22D3EE" },
-  { l:"54%", t:"19%", s:1.5, d:"12s", e:"2.1s", c:"#A07FF8" },
   { l:"68%", t:"33%", s:1,   d:"9s",  e:"0.8s", c:"#22D3EE" },
   { l:"83%", t:"13%", s:2,   d:"14s", e:"1.8s", c:"#A07FF8" },
-  { l:"12%", t:"61%", s:1.5, d:"11s", e:"3.0s", c:"#A07FF8" },
   { l:"29%", t:"74%", s:1,   d:"7s",  e:"2.5s", c:"#22D3EE" },
-  { l:"46%", t:"56%", s:2,   d:"9s",  e:"1.0s", c:"#A07FF8" },
   { l:"63%", t:"69%", s:1,   d:"13s", e:"4.0s", c:"#A07FF8" },
-  { l:"78%", t:"81%", s:1.5, d:"8s",  e:"0.3s", c:"#22D3EE" },
   { l:"90%", t:"44%", s:1,   d:"15s", e:"5.0s", c:"#A07FF8" },
-  { l:"4%",  t:"87%", s:2,   d:"10s", e:"2.8s", c:"#A07FF8" },
-  { l:"42%", t:"93%", s:1.5, d:"6s",  e:"1.5s", c:"#22D3EE" },
-  { l:"75%", t:"51%", s:1,   d:"11s", e:"3.6s", c:"#A07FF8" },
   { l:"17%", t:"43%", s:1,   d:"8s",  e:"0.2s", c:"#22D3EE" },
-  { l:"59%", t:"89%", s:1.5, d:"13s", e:"6.0s", c:"#A07FF8" },
 ];
 
 function BackdropParticles() {
@@ -122,7 +98,7 @@ function BackdropParticles() {
             left: p.l, top: p.t,
             width: `${p.s}px`, height: `${p.s}px`,
             background: p.c,
-            boxShadow: `0 0 ${p.s * 5}px ${p.c}80`,
+            willChange: "transform, opacity",
             animation: `twinkle ${p.d} ease-in-out infinite ${p.e}`,
           }}
         />
@@ -136,7 +112,6 @@ function BackdropStreaks() {
     <>
       {[
         { top: "19%", w: "190px", h: "1.5px", col: "rgba(160,127,248,0.7)", dur: "10s", del: "0s"  },
-        { top: "44%", w: "130px", h: "1px",   col: "rgba(34,211,238,0.5)",  dur: "17s", del: "5s"  },
         { top: "71%", w: "95px",  h: "0.8px", col: "rgba(182,154,255,0.4)", dur: "23s", del: "9s"  },
       ].map((s, i) => (
         <div
@@ -146,6 +121,7 @@ function BackdropStreaks() {
             top: s.top, left: 0,
             width: s.w, height: s.h,
             background: `linear-gradient(90deg, transparent, ${s.col}, transparent)`,
+            willChange: "transform",
             animation: `lightStreak ${s.dur} linear infinite ${s.del}`,
           }}
         />
@@ -209,29 +185,16 @@ function BackdropStreamLines() {
 // Atmospheric background
 // =========================================================================
 function Backdrop() {
-  const sy = useScrollY();
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
       <div className="absolute inset-0 bg-grid opacity-60" />
       <div className="absolute inset-0 bg-noise" />
 
-      {/* Aurora orbs — parallax on scroll */}
-      <div
-        className="absolute -top-40 left-1/2 w-[1100px] h-[700px] glow-orb opacity-75 aurora-1"
-        style={{ transform: `translateX(-50%) translateY(${sy * 0.12}px)` }}
-      />
-      <div
-        className="absolute top-[8%] right-[10%] w-[480px] h-[480px] iri-orb rounded-full opacity-40 aurora-2"
-        style={{ transform: `translateY(${sy * 0.06}px)` }}
-      />
-      <div
-        className="absolute top-[40%] left-[-6%] w-[400px] h-[400px] iri-orb rounded-full opacity-24 aurora-3"
-        style={{ transform: `translateY(${sy * -0.05}px)` }}
-      />
-      <div
-        className="absolute bottom-[-80px] right-[18%] w-[320px] h-[320px] glow-orb opacity-[0.16] aurora-2"
-        style={{ transform: `translateY(${sy * -0.08}px)` }}
-      />
+      {/* Aurora orbs — pure CSS animation, no JS scroll listener */}
+      <div className="absolute -top-40 left-1/2 w-[1100px] h-[700px] glow-orb opacity-75 aurora-1" style={{ willChange: "transform" }} />
+      <div className="absolute top-[8%] right-[10%] w-[480px] h-[480px] iri-orb rounded-full opacity-40 aurora-2" style={{ willChange: "transform" }} />
+      <div className="absolute top-[40%] left-[-6%] w-[400px] h-[400px] iri-orb rounded-full opacity-24 aurora-3" style={{ willChange: "transform" }} />
+      <div className="absolute bottom-[-80px] right-[18%] w-[320px] h-[320px] glow-orb opacity-[0.16] aurora-2" style={{ willChange: "transform" }} />
       <div className="absolute bottom-[-200px] left-1/2 -translate-x-1/2 w-[900px] h-[400px] glow-orb opacity-25" />
 
       {/* Flowing stream lines */}
@@ -735,8 +698,8 @@ function UseCases() {
             </button>
           </div>
 
-          <div className="lg:col-span-7 rounded-3xl grad-border glass-strong p-1.5 min-h-[420px]">
-            <div className="rounded-[20px] bg-gradient-to-b from-[#100e26]/95 to-[#07060f] p-7 h-full relative overflow-hidden">
+          <div className="lg:col-span-7 rounded-3xl grad-border glass-strong p-1.5 sm:min-h-[420px]">
+            <div className="rounded-[20px] bg-gradient-to-b from-[#100e26]/95 to-[#07060f] p-4 sm:p-7 h-full relative overflow-hidden">
               {c.demo === "workforce" && <DemoWorkforce />}
               {c.demo === "subs" && <DemoSubs />}
               {c.demo === "agents" && <DemoAgents />}
@@ -886,19 +849,19 @@ function DemoAgents() {
           {events.map((e, i) => {
             const active = i === tick % events.length;
             return (
-              <div key={i} className={`px-3 py-2.5 rounded-lg border flex items-center gap-3 transition ${active ? "border-violet-400/30 bg-violet-400/5" : "border-transparent"}`}>
-                <span className="font-mono text-[11px] text-white/40 w-14">t+{(i * 0.4).toFixed(1)}s</span>
-                <span className="font-mono text-[12px] text-violet-200">{e.from}</span>
-                <Icon name="arrow-right" size={12} className="text-white/30" />
-                <span className="font-mono text-[12px] text-cyan-200">{e.to}</span>
-                <span className="ml-auto font-mono text-[12px] text-emerald-300">+{e.amt} SOL</span>
+              <div key={i} className={`px-2 sm:px-3 py-2 rounded-lg border flex items-center gap-1.5 sm:gap-3 transition min-w-0 ${active ? "border-violet-400/30 bg-violet-400/5" : "border-transparent"}`}>
+                <span className="font-mono text-[10px] sm:text-[11px] text-white/40 shrink-0">t+{(i * 0.4).toFixed(1)}s</span>
+                <span className="font-mono text-[10px] sm:text-[12px] text-violet-200 truncate min-w-0">{e.from}</span>
+                <Icon name="arrow-right" size={10} className="text-white/30 shrink-0" />
+                <span className="font-mono text-[10px] sm:text-[12px] text-cyan-200 truncate min-w-0">{e.to}</span>
+                <span className="ml-auto font-mono text-[10px] sm:text-[12px] text-emerald-300 shrink-0 whitespace-nowrap">+{e.amt}</span>
               </div>
             );
           })}
         </div>
-        <div className="mt-2 px-2 text-[11px] font-mono text-white/35 flex items-center gap-1">
-          <span>{LANDING_AGENT_DEMO.streamId} · {tick + 1} settlements ledgered</span>
-          <span className="cursor-blink text-violet-400/70 ml-0.5">▮</span>
+        <div className="mt-2 px-2 text-[10px] sm:text-[11px] font-mono text-white/35 flex items-center gap-1 min-w-0">
+          <span className="truncate">{LANDING_AGENT_DEMO.streamId} · {tick + 1} settlements</span>
+          <span className="cursor-blink text-violet-400/70 ml-0.5 shrink-0">▮</span>
         </div>
       </div>
 

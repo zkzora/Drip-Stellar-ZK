@@ -431,9 +431,9 @@ body {
   0%, 100% { transform: translate(0, 0) scale(1); }
   50%       { transform: translate(-48px, 24px) scale(1.09); }
 }
-.aurora-1 { animation: aurora1 20s ease-in-out infinite; }
-.aurora-2 { animation: aurora2 28s ease-in-out infinite; }
-.aurora-3 { animation: aurora1 36s ease-in-out infinite reverse; }
+.aurora-1 { animation: aurora1 20s ease-in-out infinite; will-change: transform; }
+.aurora-2 { animation: aurora2 28s ease-in-out infinite; will-change: transform; }
+.aurora-3 { animation: aurora1 36s ease-in-out infinite reverse; will-change: transform; }
 
 /* Sparse particle twinkle */
 @keyframes twinkle {
