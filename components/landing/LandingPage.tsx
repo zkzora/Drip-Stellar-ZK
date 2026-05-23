@@ -1159,7 +1159,7 @@ function Footer() {
             <a href="https://youtu.be/AiHgYlBylVo" target="_blank" rel="noopener noreferrer" className="w-9 h-9 rounded-full border border-white/10 hover:border-rose-500/40 hover:text-rose-400 flex items-center justify-center text-white/55 hover:text-white transition" title="Watch demo on YouTube">
               <Icon name="youtube" size={14} />
             </a>
-            <a href="/faq" className="h-9 px-3 rounded-full border border-white/10 hover:border-white/30 flex items-center gap-1.5 text-white/55 hover:text-white text-[12px] font-mono transition">
+            <a href="/docs/faq" className="h-9 px-3 rounded-full border border-white/10 hover:border-white/30 flex items-center gap-1.5 text-white/55 hover:text-white text-[12px] font-mono transition">
               <Icon name="help-circle" size={14} /> FAQ
             </a>
             <a href="/docs" className="h-9 px-3 rounded-full border border-white/10 hover:border-white/30 flex items-center gap-1.5 text-white/55 hover:text-white text-[12px] font-mono transition">
