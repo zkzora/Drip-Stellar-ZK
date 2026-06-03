@@ -13,12 +13,14 @@ import {
   COMPLIANCE_PRESETS,
   PROTOCOL_STATS,
   REPORT_LEDGER,
+  STELLAR_COMPLIANCE_EXPORT,
 } from "@/lib/mock-data";
 import { useDripStreams } from "@/lib/solana/useDripStreams";
 import { useDripWallet } from "@/lib/solana/useDripWallet";
 import { mapUiStreamToComplianceRecord } from "@/lib/compliance/records";
 import { recordsToCsv, downloadCsv, getCsvFilename } from "@/lib/compliance/csv";
 import { SOLANA_CLUSTER } from "@/lib/solana/constants";
+import { IS_STELLAR_MODE } from "@/lib/app-config";
 import type { ComplianceStreamRecord } from "@/lib/compliance/records";
 
 // =========================================================================
@@ -26,6 +28,20 @@ import type { ComplianceStreamRecord } from "@/lib/compliance/records";
 // =========================================================================
 const CATEGORY_LABELS = COMPLIANCE_CATEGORY_LABELS;
 const CATEGORY_ICON = COMPLIANCE_CATEGORY_ICON;
+
+// Stellar-specific status-based category filters (replaces Solana categories in Stellar mode)
+const STELLAR_CATEGORY_FILTERS = [
+  { k: "all",       label: "All",       icon: "layers"          },
+  { k: "active",    label: "Active",    icon: "waves"           },
+  { k: "completed", label: "Completed", icon: "check-circle-2"  },
+  { k: "cancelled", label: "Cancelled", icon: "x-circle"        },
+];
+const STELLAR_CATEGORY_LABELS: Record<string, string> = {
+  all:       "All streams",
+  active:    "Active",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
 
 const fmtDur = (sec: number) => {
   const d = Math.floor(sec / 86400);
@@ -88,17 +104,18 @@ function DateRangeControl({ range, setRange }: any) {
 // =========================================================================
 // Category filter
 // =========================================================================
-function CategoryFilter({ value, onChange, counts }: any) {
+function CategoryFilter({ value, onChange, counts, filters }: any) {
+  const activeFilters = filters ?? COMPLIANCE_CATEGORY_FILTERS;
   return (
     <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-5">
       <div className="flex items-center justify-between mb-3">
         <label className="text-[11px] uppercase tracking-[0.18em] text-white/45 font-mono flex items-center gap-2">
           <Icon name="filter" size={12} /> Stream category
         </label>
-        <span className="text-[10.5px] font-mono text-white/35">{counts[value]} streams in scope</span>
+        <span className="text-[10.5px] font-mono text-white/35">{counts[value] ?? 0} streams in scope</span>
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-        {COMPLIANCE_CATEGORY_FILTERS.map((o: any) => (
+        {activeFilters.map((o: any) => (
           <button
             key={o.k}
             onClick={() => onChange(o.k)}
@@ -109,7 +126,7 @@ function CategoryFilter({ value, onChange, counts }: any) {
             </span>
             <div className="min-w-0">
               <div className="text-[12.5px] text-white truncate">{o.label}</div>
-              <div className="text-[10px] font-mono text-white/40">{counts[o.k]} streams</div>
+              <div className="text-[10px] font-mono text-white/40">{counts[o.k] ?? 0} streams</div>
             </div>
           </button>
         ))}
@@ -146,89 +163,215 @@ function SummaryMetric({ icon, label, value, sub, tone = "neutral", emphasize = 
 // =========================================================================
 // Reports page
 // =========================================================================
-export default function CompliancePage() {
+export default function CompliancePage({ stellarAddress, stellarStreams }: { stellarAddress?: string | null; stellarStreams?: any }) {
+  const EXPORT_CONFIG = IS_STELLAR_MODE ? STELLAR_COMPLIANCE_EXPORT : COMPLIANCE_EXPORT;
   const [range, setRange] = useState(COMPLIANCE_DEFAULT_RANGE);
   const [category, setCategory] = useState("all");
-  const [generating, setGenerating] = useState<string | null>(null); // 'pdf' | 'csv' | null
+  const [generating, setGenerating] = useState<string | null>(null);
   const [toast, setToast] = useState<any>(null);
   const [pdfToast, setPdfToast] = useState(false);
   const [page, setPage] = useState(0);
 
-  // Real stream data
-  const { streams, loading: streamsLoading, error: streamsError, refresh, usingMockData } = useDripStreams();
+  // ── Solana path ──────────────────────────────────────────────────────────
+  const { streams, loading: streamsLoading, error: streamsError, refresh, usingMockData: solanaUsingMock } = useDripStreams();
   const { connected, publicKey } = useDripWallet();
+  const stellarConnected = IS_STELLAR_MODE && !!stellarAddress;
+  const usingMockData = IS_STELLAR_MODE ? true : solanaUsingMock;
 
-  // Build compliance records from UI stream objects
   const realRecords = useMemo((): ComplianceStreamRecord[] => {
+    if (IS_STELLAR_MODE) return [];
     if (!connected || !publicKey) return [];
     return streams
       .filter((s) => !!s.publicKey)
       .map((s) => mapUiStreamToComplianceRecord(s, SOLANA_CLUSTER));
   }, [streams, connected, publicKey]);
 
-  // Executive summary - use real data when available
-  const summaryData = useMemo(() => {
-    if (!usingMockData && realRecords.length > 0) {
-      const totalOut = realRecords
-        .filter((r) => r.direction === "out")
-        .reduce((a, r) => a + r.withdrawnAmountSol, 0);
-      const totalIn = realRecords
-        .filter((r) => r.direction === "in")
-        .reduce((a, r) => a + r.withdrawnAmountSol, 0);
-      const totalDeposited = realRecords
-        .filter((r) => r.direction === "out")
-        .reduce((a, r) => a + r.depositedAmountSol, 0);
-      const aiSpend = realRecords
-        .filter((r) => r.direction === "out" && r.category === "AI_COMPUTE")
-        .reduce((a, r) => a + r.withdrawnAmountSol, 0);
-      return { totalOut, totalIn, net: totalIn - totalOut, totalDeposited, aiSpend };
-    }
-    return null;
-  }, [usingMockData, realRecords]);
+  // ── Stellar path: derive a typed ledger row per tracked stream ────────────
+  type StellarLedgerRow = {
+    streamId:    string;
+    status:      string;
+    payer:       string;
+    receiver:    string;
+    amountXlm:   number;
+    withdrawnXlm: number;
+    createdAt:   string;
+    updatedAt:   string;
+    txHash:      string;
+    explorerUrl: string;
+  };
 
-  // Filter mock ledger
+  const stellarLedgerRows = useMemo((): StellarLedgerRow[] => {
+    if (!IS_STELLAR_MODE) return [];
+    const tracked: any[] = stellarStreams?.streams ?? [];
+    return tracked
+      .filter((s) => !s.isLoading)      // skip rows still loading
+      .map((s): StellarLedgerRow => {
+        const status  = s.onChainState?.status ?? s.lastKnownStatus ?? "unknown";
+        const amtXlm  = (() => { try { return Number(BigInt(s.amountStroops || "0")) / 10_000_000; } catch { return 0; } })();
+        const wdnXlm  = (() => { try { return Number(BigInt(s.onChainState?.withdrawn || "0")) / 10_000_000; } catch { return 0; } })();
+        const contractId = process.env.NEXT_PUBLIC_STELLAR_CONTRACT_ID ?? "";
+        const explorerUrl = s.createdTxHash
+          ? `https://stellar.expert/explorer/testnet/tx/${s.createdTxHash}`
+          : contractId
+            ? `https://stellar.expert/explorer/testnet/contract/${contractId}`
+            : "";
+        return {
+          streamId:     s.streamId,
+          status,
+          payer:        s.payer       ?? "",
+          receiver:     s.receiver    ?? "",
+          amountXlm:   amtXlm,
+          withdrawnXlm: wdnXlm,
+          createdAt:   s.createdAt    ?? "",
+          updatedAt:   s.lastLoadedAt ?? "",
+          txHash:      s.createdTxHash ?? "",
+          explorerUrl,
+        };
+      });
+  }, [stellarStreams]);
+
+  // Filter Stellar rows by the status-based category selector
+  const filteredStellarRows = useMemo((): StellarLedgerRow[] => {
+    if (category === "all") return stellarLedgerRows;
+    return stellarLedgerRows.filter((r) => r.status.toLowerCase() === category);
+  }, [stellarLedgerRows, category]);
+
+  // ── Stellar category counts ───────────────────────────────────────────────
+  const stellarCounts = useMemo(() => {
+    const rows = stellarLedgerRows;
+    return {
+      all:       rows.length,
+      active:    rows.filter(r => r.status === "Active").length,
+      completed: rows.filter(r => r.status === "Completed").length,
+      cancelled: rows.filter(r => r.status === "Cancelled").length,
+    };
+  }, [stellarLedgerRows]);
+
+  // ── Stellar executive summary ─────────────────────────────────────────────
+  // Direction: payer = streamed out; receiver = incoming.
+  // If walletAddress matches payer → outgoing; matches receiver → incoming.
+  const stellarSummary = useMemo(() => {
+    if (!IS_STELLAR_MODE || stellarLedgerRows.length === 0) return null;
+    const wa = stellarAddress ?? "";
+    let totalOut = 0, totalIn = 0;
+    for (const r of stellarLedgerRows) {
+      if (r.payer === wa)    totalOut += r.amountXlm;
+      if (r.receiver === wa) totalIn  += r.withdrawnXlm;
+    }
+    return { totalOut, totalIn, net: totalIn - totalOut };
+  }, [stellarLedgerRows, stellarAddress]);
+
+  // ── Solana mock ledger (Solana mode only) ────────────────────────────────
   const filtered = useMemo(() => {
+    if (IS_STELLAR_MODE) return [];
     return REPORT_LEDGER.filter((r: any) => {
       if (category !== "all" && r.category !== category) return false;
       if (range.from && r.date < range.from) return false;
-      if (range.to && r.date > range.to) return false;
+      if (range.to   && r.date > range.to)   return false;
       return true;
     });
   }, [range, category]);
 
-  // Counts per category for filter chips (respecting date range)
   const counts = useMemo(() => {
+    if (IS_STELLAR_MODE) return stellarCounts;
     const inDate = REPORT_LEDGER.filter(
-      (r: any) =>
-        (!range.from || r.date >= range.from) && (!range.to || r.date <= range.to),
+      (r: any) => (!range.from || r.date >= range.from) && (!range.to || r.date <= range.to),
     );
     return {
-      all: inDate.length,
-      payroll: inDate.filter((r: any) => r.category === "payroll").length,
+      all:          inDate.length,
+      payroll:      inDate.filter((r: any) => r.category === "payroll").length,
       "ai-compute": inDate.filter((r: any) => r.category === "ai-compute").length,
-      subs: inDate.filter((r: any) => r.category === "subs").length,
+      subs:         inDate.filter((r: any) => r.category === "subs").length,
     };
-  }, [range]);
+  }, [range, stellarCounts]);
 
+  // ── Solana executive summary ──────────────────────────────────────────────
+  const summaryData = useMemo(() => {
+    if (!usingMockData && realRecords.length > 0) {
+      const totalOut = realRecords.filter(r => r.direction === "out").reduce((a, r) => a + r.withdrawnAmountSol, 0);
+      const totalIn  = realRecords.filter(r => r.direction === "in" ).reduce((a, r) => a + r.withdrawnAmountSol, 0);
+      return { totalOut, totalIn, net: totalIn - totalOut };
+    }
+    return null;
+  }, [usingMockData, realRecords]);
+
+  // ── Unified totals ────────────────────────────────────────────────────────
   const totals = useMemo(() => {
-    if (summaryData) {
-      // Real data - show SOL values
+    if (IS_STELLAR_MODE && stellarSummary) {
       return {
-        out: summaryData.totalOut,
-        in: summaryData.totalIn,
-        tax: summaryData.totalOut * COMPLIANCE_EXPORT.taxRate,
-        net: summaryData.net,
+        out:    stellarSummary.totalOut,
+        in:     stellarSummary.totalIn,
+        tax:    stellarSummary.totalOut * EXPORT_CONFIG.taxRate,
+        net:    stellarSummary.net,
+        isReal: true,
+      };
+    }
+    if (!IS_STELLAR_MODE && summaryData) {
+      return {
+        out:    summaryData.totalOut,
+        in:     summaryData.totalIn,
+        tax:    summaryData.totalOut * EXPORT_CONFIG.taxRate,
+        net:    summaryData.net,
         isReal: true,
       };
     }
     const out = filtered.filter((r: any) => r.type === "out").reduce((a: number, r: any) => a + r.amount, 0);
-    const inn = filtered.filter((r: any) => r.type === "in").reduce((a: number, r: any) => a + r.amount, 0);
-    const tax = out * COMPLIANCE_EXPORT.taxRate;
-    return { out, in: inn, tax, net: inn - out, isReal: false };
-  }, [filtered, summaryData]);
+    const inn = filtered.filter((r: any) => r.type === "in" ).reduce((a: number, r: any) => a + r.amount, 0);
+    return { out, in: inn, tax: out * EXPORT_CONFIG.taxRate, net: inn - out, isReal: false };
+  }, [filtered, summaryData, stellarSummary]);
 
-  // CSV export handler
+  // ── CSV export ────────────────────────────────────────────────────────────
+  // Build Stellar CSV from tracked rows (no old Solana records dependency)
+  const buildStellarCsv = useCallback((rows: StellarLedgerRow[]): string => {
+    const today = new Date().toISOString().slice(0, 10);
+    const headers = [
+      "stream_id", "status", "payer", "receiver",
+      "amount_xlm", "withdrawn_xlm",
+      "created_at", "updated_at", "tx_hash", "explorer_url", "source",
+    ];
+    const escape = (v: string) => `"${String(v).replace(/"/g, '""')}"`;
+    const lines = [
+      headers.join(","),
+      ...rows.map(r => [
+        escape(`#${r.streamId}`),
+        escape(r.status),
+        escape(r.payer),
+        escape(r.receiver),
+        r.amountXlm.toFixed(7),
+        r.withdrawnXlm.toFixed(7),
+        escape(r.createdAt),
+        escape(r.updatedAt),
+        escape(r.txHash),
+        escape(r.explorerUrl),
+        escape("stellar-testnet:local-registry"),
+      ].join(",")),
+    ];
+    return lines.join("\n");
+  }, []);
+
+  const handleStellarCsvExport = useCallback(() => {
+    if (filteredStellarRows.length === 0) {
+      setToast({ kind: "csv-empty" });
+      setTimeout(() => setToast(null), 4000);
+      return;
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    const csv = buildStellarCsv(filteredStellarRows);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `drip-stellar-ledger-${today}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setToast({ kind: "csv", count: filteredStellarRows.length, filename: `drip-stellar-ledger-${today}.csv` });
+    setTimeout(() => setToast(null), 4000);
+  }, [filteredStellarRows, buildStellarCsv]);
+
   const handleCsvExport = useCallback(() => {
+    if (IS_STELLAR_MODE) { handleStellarCsvExport(); return; }
     const records = !usingMockData ? realRecords : [];
     if (records.length === 0) {
       setToast({ kind: "csv-empty" });
@@ -239,15 +382,13 @@ export default function CompliancePage() {
     downloadCsv(csv, getCsvFilename());
     setToast({ kind: "csv", count: records.length });
     setTimeout(() => setToast(null), 4000);
-  }, [usingMockData, realRecords]);
+  }, [usingMockData, realRecords, handleStellarCsvExport]);
 
-  // PDF export handler (coming soon)
   const handlePdfExport = useCallback(() => {
     setPdfToast(true);
     setTimeout(() => setPdfToast(false), 4000);
   }, []);
 
-  // Mock export for demo mode
   const handleMockExport = (kind: string) => {
     setGenerating(kind);
     setTimeout(() => {
@@ -257,11 +398,25 @@ export default function CompliancePage() {
     }, 1600);
   };
 
-  const PAGE_SIZE = COMPLIANCE_EXPORT.pageSize;
-  const visible = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  // ── Pagination (Solana mock only) ─────────────────────────────────────────
+  const PAGE_SIZE  = EXPORT_CONFIG.pageSize;
+  const visible    = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
 
-  const csvRowCount = !usingMockData ? realRecords.length : filtered.length;
+  // Row count for PDF metadata line
+  const csvRowCount = IS_STELLAR_MODE
+    ? filteredStellarRows.length
+    : (!usingMockData ? realRecords.length : filtered.length);
+
+  // CSV button enabled state
+  const csvEnabled = IS_STELLAR_MODE
+    ? filteredStellarRows.length > 0
+    : (!usingMockData ? realRecords.length > 0 : filtered.length > 0);
+
+  // Active category label (Stellar uses its own labels)
+  const activeCategoryLabel = IS_STELLAR_MODE
+    ? (STELLAR_CATEGORY_LABELS[category] ?? "All streams")
+    : (CATEGORY_LABELS[category] ?? "All");
 
   return (
     <div className="space-y-7 relative">
@@ -269,13 +424,15 @@ export default function CompliancePage() {
       <PageHeader
         eyebrow="07 - Reports & Compliance"
         title={<>Audit-ready, in three clicks.</>}
-        sub="CSV export is live - download accountant-ready records straight from on-chain stream data. Every row is verifiable on Solscan. PDF export coming next."
+        sub={IS_STELLAR_MODE
+          ? "Export tracked Stellar stream records as CSV. Accounting sync integrations are planned."
+          : "CSV export is live - download accountant-ready records straight from on-chain stream data. Every row is verifiable on Solscan. PDF export coming next."}
         right={
           <div className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-full border border-emerald-400/30 bg-emerald-400/5 text-[12px] font-mono">
             <Icon name="shield-check" size={12} className="text-emerald-300" />
             <span className="text-emerald-300">Data verified on-chain</span>
             <span className="text-emerald-300/50">·</span>
-            <span className="text-emerald-200/70">{COMPLIANCE_EXPORT.networkLabel}</span>
+            <span className="text-emerald-200/70">{IS_STELLAR_MODE ? "Stellar Testnet" : EXPORT_CONFIG.networkLabel}</span>
           </div>
         }
       />
@@ -289,29 +446,32 @@ export default function CompliancePage() {
         <StepPill n="3" label="Export" />
       </div>
 
-      {/* Stream loading / error / empty states */}
-      {connected && streamsLoading && (
+      {/* Stream loading / error / empty states — Solana mode only */}
+      {!IS_STELLAR_MODE && connected && streamsLoading && (
         <div className="rounded-xl border border-white/8 bg-white/[0.02] px-5 py-3 flex items-center gap-3 text-[13px] text-white/65">
           <Icon name="loader-2" size={14} className="animate-spin text-violet-300" />
           Loading stream records...
         </div>
       )}
-      {connected && streamsError && (
+      {!IS_STELLAR_MODE && connected && streamsError && (
         <div className="rounded-xl border border-rose-400/25 bg-rose-400/5 px-5 py-3 flex items-center gap-3 text-[13px] text-rose-200">
           <Icon name="triangle-alert" size={14} className="text-rose-300 shrink-0" />
           <span>Error loading streams: {streamsError}</span>
-          <button
-            onClick={refresh}
-            className="ml-auto text-[12px] font-mono text-white/65 hover:text-white border border-white/15 rounded-full px-3 py-1"
-          >
+          <button onClick={refresh} className="ml-auto text-[12px] font-mono text-white/65 hover:text-white border border-white/15 rounded-full px-3 py-1">
             Retry
           </button>
         </div>
       )}
-      {!usingMockData && realRecords.length === 0 && !streamsLoading && connected && !streamsError && (
+      {!IS_STELLAR_MODE && !usingMockData && realRecords.length === 0 && !streamsLoading && connected && !streamsError && (
         <div className="rounded-xl border border-white/8 bg-white/[0.02] px-5 py-4 flex items-center gap-3 text-[13px] text-white/55">
           <Icon name="inbox" size={14} className="text-white/35" />
           No stream records yet. Create a stream to generate compliance records.
+        </div>
+      )}
+      {IS_STELLAR_MODE && !stellarConnected && (
+        <div className="rounded-xl border border-white/8 bg-white/[0.02] px-5 py-4 flex items-center gap-3 text-[13px] text-white/55">
+          <Icon name="fingerprint" size={14} className="text-white/35" />
+          Connect Freighter to view on-chain compliance records.
         </div>
       )}
 
@@ -319,40 +479,44 @@ export default function CompliancePage() {
       <section className="space-y-3">
         <SectionLabel num="01" title="Filter engine" desc="Define what to include in the report." />
         <div className="grid lg:grid-cols-2 gap-4">
-          <DateRangeControl range={range} setRange={setRange} />
-          <CategoryFilter value={category} onChange={setCategory} counts={counts} />
+          {/* Date range only shown in Solana mode; Stellar streams don't have reliable dates for filtering */}
+          {!IS_STELLAR_MODE && <DateRangeControl range={range} setRange={setRange} />}
+          <CategoryFilter
+            value={category}
+            onChange={setCategory}
+            counts={counts}
+            filters={IS_STELLAR_MODE ? STELLAR_CATEGORY_FILTERS : undefined}
+          />
         </div>
         {/* Active filter summary */}
         <div className="flex items-center flex-wrap gap-2 text-[12px] text-white/55 px-1">
           <Icon name="info" size={12} />
           <span>Showing</span>
-          <span className="text-white font-mono">{usingMockData ? filtered.length : realRecords.length}</span>
+          <span className="text-white font-mono">
+            {IS_STELLAR_MODE ? filteredStellarRows.length : (usingMockData ? filtered.length : realRecords.length)}
+          </span>
           <span>streams</span>
-          {usingMockData && (
+          {!IS_STELLAR_MODE && usingMockData && (
             <>
-              <span>from</span>
-              <span className="text-white font-mono">{range.from}</span>
-              <span>to</span>
-              <span className="text-white font-mono">{range.to}</span>
+              <span>from</span><span className="text-white font-mono">{range.from}</span>
+              <span>to</span><span className="text-white font-mono">{range.to}</span>
             </>
           )}
           <span>·</span>
-          <span className="text-violet-300">{CATEGORY_LABELS[category]}</span>
-          {!usingMockData && (
-            <span className="ml-1 text-[10.5px] font-mono px-2 py-0.5 rounded-full border border-emerald-400/30 text-emerald-300 bg-emerald-400/5">
-              on-chain
+          <span className="text-violet-300">{activeCategoryLabel}</span>
+          {IS_STELLAR_MODE && (
+            <span className="ml-1 text-[10.5px] font-mono px-2 py-0.5 rounded-full border border-sky-400/30 text-sky-300 bg-sky-400/5">
+              {stellarConnected ? "Stellar Testnet" : "wallet not connected"}
             </span>
           )}
-          {usingMockData && (
-            <span className="ml-1 text-[10.5px] font-mono px-2 py-0.5 rounded-full border border-amber-400/30 text-amber-300 bg-amber-400/5">
-              demo data
-            </span>
+          {!IS_STELLAR_MODE && !usingMockData && (
+            <span className="ml-1 text-[10.5px] font-mono px-2 py-0.5 rounded-full border border-emerald-400/30 text-emerald-300 bg-emerald-400/5">on-chain</span>
           )}
-          {(category !== "all" || range.preset !== "month") && usingMockData && (
-            <button
-              onClick={() => { setCategory("all"); setRange(COMPLIANCE_DEFAULT_RANGE); }}
-              className="ml-auto text-[11.5px] font-mono text-white/55 hover:text-white flex items-center gap-1"
-            >
+          {!IS_STELLAR_MODE && usingMockData && (
+            <span className="ml-1 text-[10.5px] font-mono px-2 py-0.5 rounded-full border border-amber-400/30 text-amber-300 bg-amber-400/5">demo data</span>
+          )}
+          {!IS_STELLAR_MODE && (category !== "all" || range.preset !== "month") && usingMockData && (
+            <button onClick={() => { setCategory("all"); setRange(COMPLIANCE_DEFAULT_RANGE); }} className="ml-auto text-[11.5px] font-mono text-white/55 hover:text-white flex items-center gap-1">
               <Icon name="rotate-ccw" size={11} /> Reset filters
             </button>
           )}
@@ -368,46 +532,53 @@ export default function CompliancePage() {
               <SummaryMetric
                 icon="arrow-up-right"
                 label="Total streamed (out)"
-                value={`${fmtSol4(totals.out)} SOL`}
-                sub={`${realRecords.filter((r) => r.direction === "out").length} outgoing streams`}
+                value={`${fmtSol4(totals.out)} ${IS_STELLAR_MODE ? "XLM" : "SOL"}`}
+                sub={IS_STELLAR_MODE
+                  ? `${stellarLedgerRows.filter(r => r.payer === stellarAddress).length} outgoing streams`
+                  : `${realRecords.filter(r => r.direction === "out").length} outgoing streams`}
                 tone="down"
               />
               <SummaryMetric
                 icon="arrow-down-left"
                 label="Total received (in)"
-                value={`${fmtSol4(totals.in)} SOL`}
-                sub={`${realRecords.filter((r) => r.direction === "in").length} incoming streams`}
+                value={`${fmtSol4(totals.in)} ${IS_STELLAR_MODE ? "XLM" : "SOL"}`}
+                sub={IS_STELLAR_MODE
+                  ? `${stellarLedgerRows.filter(r => r.receiver === stellarAddress).length} incoming streams`
+                  : `${realRecords.filter(r => r.direction === "in").length} incoming streams`}
                 tone="up"
               />
               <SummaryMetric
                 icon="scale"
                 label="Net position"
-                value={`${totals.net >= 0 ? "+" : "-"}${fmtSol4(Math.abs(totals.net))} SOL`}
+                value={`${totals.net >= 0 ? "+" : "-"}${fmtSol4(Math.abs(totals.net))} ${IS_STELLAR_MODE ? "XLM" : "SOL"}`}
                 sub="received - streamed"
                 tone={totals.net >= 0 ? "up" : "down"}
               />
               <SummaryMetric
                 icon="landmark"
-                label="Est. tax liability"
-                value={`${fmtSol4(totals.tax)} SOL`}
-                sub="10% flat · indicative only"
+                label={IS_STELLAR_MODE ? "Est. tax (testnet)" : "Est. tax liability"}
+                value={`${fmtSol4(totals.tax)} ${IS_STELLAR_MODE ? "XLM" : "SOL"}`}
+                sub={IS_STELLAR_MODE ? "10% flat · testnet estimate only" : "10% flat · indicative only"}
                 tone="accent"
                 emphasize
               />
             </>
           ) : (
             <>
-              <SummaryMetric icon="arrow-up-right" label="Total streamed (out)" value={`◎${fmtSol4(totals.out)}`} sub={`${filtered.filter((r: any) => r.type === "out").length} outgoing streams`} tone="down" />
-              <SummaryMetric icon="arrow-down-left" label="Total received (in)" value={`◎${fmtSol4(totals.in)}`} sub={`${filtered.filter((r: any) => r.type === "in").length} incoming streams`} tone="up" />
-              <SummaryMetric icon="scale" label="Net position" value={`${totals.net >= 0 ? "+" : "-"}◎${fmtSol4(Math.abs(totals.net))}`} sub="received - streamed" tone={totals.net >= 0 ? "up" : "down"} />
-              <SummaryMetric icon="landmark" label="Estimated tax liability" value={`◎${fmtSol4(totals.tax)}`} sub="10% flat - indicative only" tone="accent" emphasize />
+              <SummaryMetric icon="arrow-up-right" label="Total streamed (out)" value={`${IS_STELLAR_MODE ? "✦" : "◎"}${fmtSol4(totals.out)}`} sub={`${filtered.filter((r: any) => r.type === "out").length} outgoing streams`} tone="down" />
+              <SummaryMetric icon="arrow-down-left" label="Total received (in)"  value={`${IS_STELLAR_MODE ? "✦" : "◎"}${fmtSol4(totals.in)}`}  sub={`${filtered.filter((r: any) => r.type === "in").length} incoming streams`}  tone="up" />
+              <SummaryMetric icon="scale"           label="Net position"         value={`${totals.net >= 0 ? "+" : "-"}${IS_STELLAR_MODE ? "✦" : "◎"}${fmtSol4(Math.abs(totals.net))}`} sub="received - streamed" tone={totals.net >= 0 ? "up" : "down"} />
+              <SummaryMetric icon="landmark"        label="Estimated tax"        value={`${IS_STELLAR_MODE ? "✦" : "◎"}${fmtSol4(totals.tax)}`} sub="10% flat - indicative only" tone="accent" emphasize />
             </>
           )}
         </div>
         <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.04] p-3.5 flex items-start gap-3">
           <Icon name="triangle-alert" size={14} className="text-amber-300 mt-0.5 shrink-0" />
           <div className="text-[12px] text-amber-100/85 leading-relaxed">
-            <span className="text-amber-200">Disclaimer:</span> Tax liability is a flat-rate estimate for planning purposes. Drip is not a tax advisor - consult a CPA for filing. The exported PDF includes raw, verifiable data without estimation.
+            <span className="text-amber-200">Disclaimer:</span>{" "}
+            {IS_STELLAR_MODE
+              ? "This is a testnet app — no real funds. Tax estimates are illustrative only."
+              : "Tax liability is a flat-rate estimate for planning purposes. Drip is not a tax advisor - consult a CPA for filing."}
           </div>
         </div>
       </section>
@@ -416,19 +587,16 @@ export default function CompliancePage() {
       <section className="space-y-3">
         <SectionLabel num="03" title="Export" desc="Generate audit-ready artifacts." />
 
-        {/* PDF toast notification */}
         {pdfToast && (
           <div className="rounded-xl border border-violet-400/25 bg-violet-400/5 px-5 py-3 flex items-center gap-3 text-[13px] text-violet-200">
             <Icon name="info" size={14} className="text-violet-300 shrink-0" />
             <span>PDF export is coming in a future release. Use CSV export for now.</span>
-            <button onClick={() => setPdfToast(false)} className="ml-auto text-white/40 hover:text-white">
-              <Icon name="x" size={13} />
-            </button>
+            <button onClick={() => setPdfToast(false)} className="ml-auto text-white/40 hover:text-white"><Icon name="x" size={13} /></button>
           </div>
         )}
 
         <div className="grid lg:grid-cols-3 gap-4">
-          {/* Primary action - 2/3 width */}
+          {/* Primary — PDF */}
           <div className="lg:col-span-2 grad-border glass-strong rounded-2xl p-1.5 relative overflow-hidden">
             <div className="absolute -top-20 -right-20 w-60 h-60 iri-orb rounded-full opacity-40 pointer-events-none" />
             <div className="absolute -bottom-20 -left-20 w-60 h-60 glow-orb opacity-25 pointer-events-none" />
@@ -452,10 +620,7 @@ export default function CompliancePage() {
                     <span>·</span>
                     <span className="flex items-center gap-1"><Icon name="languages" size={11} /> EN / DE / ES</span>
                   </div>
-                  <button
-                    onClick={handlePdfExport}
-                    className="mt-5 btn-primary rounded-full px-6 py-3 text-[14px] font-medium text-white inline-flex items-center gap-2"
-                  >
+                  <button onClick={handlePdfExport} className="mt-5 btn-primary rounded-full px-6 py-3 text-[14px] font-medium text-white inline-flex items-center gap-2">
                     <Icon name="download" size={15} /> Download Audit-Ready PDF
                   </button>
                 </div>
@@ -463,21 +628,37 @@ export default function CompliancePage() {
             </div>
           </div>
 
-          {/* Secondary action - CSV */}
+          {/* Secondary — CSV */}
           <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 flex flex-col">
             <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
               <Icon name="table-2" size={18} className="text-cyan-300" />
             </div>
             <h3 className="mt-4 text-[16px] tracking-tight text-white">Export CSV</h3>
             <p className="mt-1.5 text-[12.5px] text-white/55 leading-relaxed">
-              Format targets <span className="text-white">Xero</span>, <span className="text-white">QuickBooks</span>, and <span className="text-white">Wave</span> chart-of-accounts. Direct sync integrations are planned.
+              {IS_STELLAR_MODE
+                ? "Download your tracked Stellar stream records as a CSV file."
+                : <>Format targets <span className="text-white">Xero</span>, <span className="text-white">QuickBooks</span>, and <span className="text-white">Wave</span> chart-of-accounts.</>}
             </p>
             <div className="mt-4 flex items-center gap-2 flex-wrap">
-              {COMPLIANCE_EXPORT.integrations.map((s: string) => (
-                <span key={s} className="text-[10.5px] font-mono px-2 py-0.5 rounded-full border border-white/10 text-white/65">{s}</span>
-              ))}
+              {IS_STELLAR_MODE ? (
+                <>
+                  <span className="text-[10.5px] font-mono px-2 py-0.5 rounded-full border border-sky-400/20 text-sky-300/70">CSV download live</span>
+                  <span className="text-[10.5px] font-mono px-2 py-0.5 rounded-full border border-white/10 text-white/40">Xero sync planned</span>
+                  <span className="text-[10.5px] font-mono px-2 py-0.5 rounded-full border border-white/10 text-white/40">QuickBooks planned</span>
+                </>
+              ) : (
+                EXPORT_CONFIG.integrations.map((s: string) => (
+                  <span key={s} className="text-[10.5px] font-mono px-2 py-0.5 rounded-full border border-white/10 text-white/65">{s}</span>
+                ))
+              )}
             </div>
-            {!usingMockData && (
+            {IS_STELLAR_MODE && csvRowCount > 0 && (
+              <div className="mt-3 text-[11px] font-mono text-emerald-300/80 flex items-center gap-1">
+                <Icon name="shield-check" size={11} />
+                {csvRowCount} stream record{csvRowCount !== 1 ? "s" : ""} ready to export
+              </div>
+            )}
+            {!IS_STELLAR_MODE && !usingMockData && (
               <div className="mt-3 text-[11px] font-mono text-emerald-300/80 flex items-center gap-1">
                 <Icon name="shield-check" size={11} />
                 {realRecords.length} on-chain record{realRecords.length !== 1 ? "s" : ""} ready
@@ -485,8 +666,8 @@ export default function CompliancePage() {
             )}
             <div className="mt-auto pt-5">
               <button
-                onClick={usingMockData ? () => handleMockExport("csv") : handleCsvExport}
-                disabled={generating !== null || (usingMockData && filtered.length === 0)}
+                onClick={IS_STELLAR_MODE ? handleStellarCsvExport : (usingMockData ? () => handleMockExport("csv") : handleCsvExport)}
+                disabled={generating !== null || !csvEnabled}
                 className="btn-ghost rounded-full px-5 py-2.5 text-[13px] text-white inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {generating === "csv" ? (
@@ -501,7 +682,7 @@ export default function CompliancePage() {
 
         {/* Supplementary actions */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-          {COMPLIANCE_EXPORT.secondaryActions.map((action: any, index: number) => (
+          {EXPORT_CONFIG.secondaryActions.map((action: any, index: number) => (
             <SecondaryAction key={`${action.label}-${index}`} {...action} />
           ))}
         </div>
@@ -516,18 +697,20 @@ export default function CompliancePage() {
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse-dot shrink-0" />
               <span className="text-emerald-300">100% On-Chain Verified</span>
               <span className="text-emerald-300/50">·</span>
-              <span className="text-emerald-200/80">{COMPLIANCE_EXPORT.ledgerNetworkLabel}</span>
+              <span className="text-emerald-200/80">{IS_STELLAR_MODE ? "Stellar Testnet" : EXPORT_CONFIG.ledgerNetworkLabel}</span>
               <span className="text-white/30">·</span>
-              <span className="text-white/55">{usingMockData ? filtered.length : realRecords.length} rows</span>
+              <span className="text-white/55">
+                {IS_STELLAR_MODE ? filteredStellarRows.length : (usingMockData ? filtered.length : realRecords.length)} rows
+              </span>
             </div>
             <div className="hidden sm:flex items-center gap-2 text-[11.5px] font-mono text-white/45">
               <Icon name="hash" size={11} />
-              <span>Solana slot {PROTOCOL_STATS.complianceSlot}</span>
+              <span>{IS_STELLAR_MODE ? "Stellar Testnet" : `Solana slot ${PROTOCOL_STATS.complianceSlot}`}</span>
             </div>
           </div>
 
-          {/* Real records table */}
-          {!usingMockData && realRecords.length > 0 && (
+          {/* Solana real records */}
+          {!IS_STELLAR_MODE && !usingMockData && realRecords.length > 0 && (
             <>
               <div className="hidden sm:grid grid-cols-12 gap-2 px-5 py-2.5 text-[10px] uppercase tracking-[0.16em] text-white/40 font-mono border-b border-white/5">
                 <div className="col-span-2">Stream account</div>
@@ -538,14 +721,68 @@ export default function CompliancePage() {
                 <div className="col-span-2 text-right">Deposited (SOL)</div>
                 <div className="col-span-2 text-right">Explorer</div>
               </div>
-              {realRecords.map((r, i) => (
-                <RealLedgerRow key={`${r.streamAccount}-${i}`} record={r} />
-              ))}
+              {realRecords.map((r, i) => (<RealLedgerRow key={`${r.streamAccount}-${i}`} record={r} />))}
             </>
           )}
 
-          {/* Mock / demo records table */}
-          {usingMockData && (
+          {/* Stellar tracked streams */}
+          {IS_STELLAR_MODE && (() => {
+            if (filteredStellarRows.length === 0) {
+              return (
+                <div className="px-6 py-16 text-center">
+                  <div className="w-12 h-12 rounded-full mx-auto bg-white/5 flex items-center justify-center text-white/40">
+                    <Icon name="inbox" size={18} />
+                  </div>
+                  <div className="mt-3 text-[14px] text-white/65">
+                    {stellarLedgerRows.length > 0
+                      ? "No streams match this filter."
+                      : "No on-chain ledger records yet."}
+                  </div>
+                  <div className="mt-1 text-[12px] text-white/40">
+                    {stellarLedgerRows.length > 0
+                      ? "Try selecting a different category."
+                      : "Create a Stellar stream to generate compliance records."}
+                  </div>
+                </div>
+              );
+            }
+            return (
+              <>
+                <div className="hidden sm:grid grid-cols-12 gap-2 px-5 py-2.5 text-[10px] uppercase tracking-[0.16em] text-white/40 font-mono border-b border-white/5">
+                  <div className="col-span-2">Stream</div>
+                  <div className="col-span-3">Receiver</div>
+                  <div className="col-span-2">Status</div>
+                  <div className="col-span-2 text-right">Amount (XLM)</div>
+                  <div className="col-span-2 text-right">Withdrawn (XLM)</div>
+                  <div className="col-span-1 text-right">Explorer</div>
+                </div>
+                {filteredStellarRows.map((r) => {
+                  const status = r.status;
+                  const statusCls = status === "Active" ? "text-emerald-300" : status === "Paused" ? "text-amber-300" : "text-white/40";
+                  const shortRec = r.receiver ? `${r.receiver.slice(0, 6)}…${r.receiver.slice(-4)}` : "—";
+                  return (
+                    <div key={r.streamId} className="hidden sm:grid grid-cols-12 gap-2 px-5 py-3.5 text-[12.5px] border-b border-white/[0.04] hover:bg-white/[0.02] items-center">
+                      <div className="col-span-2 font-mono text-sky-300">#{r.streamId}</div>
+                      <div className="col-span-3 font-mono text-white/65 truncate" title={r.receiver}>{shortRec}</div>
+                      <div className={`col-span-2 font-mono text-[11.5px] ${statusCls}`}>{status}</div>
+                      <div className="col-span-2 text-right font-num text-white">{r.amountXlm.toFixed(4)}</div>
+                      <div className="col-span-2 text-right font-num text-emerald-300">{r.withdrawnXlm.toFixed(4)}</div>
+                      <div className="col-span-1 text-right">
+                        {r.explorerUrl ? (
+                          <a href={r.explorerUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-violet-300/70 hover:text-white">
+                            <Icon name="arrow-up-right" size={11} />
+                          </a>
+                        ) : <span className="text-white/20">—</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            );
+          })()}
+
+          {/* Solana mock / demo records */}
+          {usingMockData && !IS_STELLAR_MODE && (
             <>
               <div className="hidden sm:grid grid-cols-12 gap-2 px-5 py-2.5 text-[10px] uppercase tracking-[0.16em] text-white/40 font-mono border-b border-white/5">
                 <div className="col-span-1">Date</div>
@@ -556,7 +793,6 @@ export default function CompliancePage() {
                 <div className="col-span-2 text-right">Amount (SOL)</div>
                 <div className="col-span-2 text-right">Tx hash</div>
               </div>
-
               {visible.length === 0 && (
                 <div className="px-6 py-16 text-center">
                   <div className="w-12 h-12 rounded-full mx-auto bg-white/5 flex items-center justify-center text-white/40">
@@ -566,31 +802,20 @@ export default function CompliancePage() {
                   <div className="mt-1 text-[12px] text-white/40">Try widening the date range or selecting "All categories".</div>
                 </div>
               )}
-
-              {visible.map((r: any, i: number) => (
-                <LedgerRow key={r.tx + i} row={r} />
-              ))}
+              {visible.map((r: any, i: number) => (<LedgerRow key={r.tx + i} row={r} />))}
             </>
           )}
 
-          {/* Footer / pagination (mock only) */}
-          {usingMockData && filtered.length > PAGE_SIZE && (
+          {/* Pagination — Solana mock only */}
+          {!IS_STELLAR_MODE && usingMockData && filtered.length > PAGE_SIZE && (
             <div className="flex items-center justify-between px-5 py-3 border-t border-white/5 bg-white/[0.02] text-[12px] font-mono">
               <span className="text-white/45">
-                Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
+                Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
               </span>
               <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                  className="w-7 h-7 rounded-md border border-white/10 text-white/65 hover:text-white hover:border-white/30 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
-                ><Icon name="chevron-left" size={12} /></button>
+                <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="w-7 h-7 rounded-md border border-white/10 text-white/65 hover:text-white hover:border-white/30 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"><Icon name="chevron-left" size={12} /></button>
                 <span className="text-white/65 px-2">{page + 1} / {totalPages}</span>
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                  disabled={page >= totalPages - 1}
-                  className="w-7 h-7 rounded-md border border-white/10 text-white/65 hover:text-white hover:border-white/30 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
-                ><Icon name="chevron-right" size={12} /></button>
+                <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="w-7 h-7 rounded-md border border-white/10 text-white/65 hover:text-white hover:border-white/30 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"><Icon name="chevron-right" size={12} /></button>
               </div>
             </div>
           )}
@@ -609,22 +834,20 @@ export default function CompliancePage() {
                 {toast.kind === "csv-empty" ? (
                   <>
                     <div className="text-[13px] text-white">No records to export</div>
-                    <div className="text-[11px] font-mono text-white/45">Connect wallet and create streams first</div>
+                    <div className="text-[11px] font-mono text-white/45">
+                      {IS_STELLAR_MODE ? "Create or load a Stellar stream first" : "Connect wallet and create streams first"}
+                    </div>
                   </>
                 ) : (
                   <>
-                    <div className="text-[13px] text-white">
-                      {toast.kind === "pdf" ? "Audit PDF" : "CSV"} ready
-                    </div>
+                    <div className="text-[13px] text-white">{toast.kind === "pdf" ? "Audit PDF" : "CSV"} ready</div>
                     <div className="text-[11px] font-mono text-white/45">
-                      {toast.count} rows · drip-report-{toast.kind === "pdf" ? `${COMPLIANCE_EXPORT.fileStem}.pdf` : `${COMPLIANCE_EXPORT.fileStem}.csv`}
+                      {toast.count} rows · {toast.filename ?? `drip-report-${toast.kind === "pdf" ? `${EXPORT_CONFIG.fileStem}.pdf` : `${EXPORT_CONFIG.fileStem}.csv`}`}
                     </div>
                   </>
                 )}
               </div>
-              <button onClick={() => setToast(null)} className="text-white/40 hover:text-white">
-                <Icon name="x" size={14} />
-              </button>
+              <button onClick={() => setToast(null)} className="text-white/40 hover:text-white"><Icon name="x" size={14} /></button>
             </div>
           </div>
         </div>
@@ -685,7 +908,7 @@ function LedgerRow({ row }: any) {
             <span className="text-[12.5px] text-white truncate">{row.counterparty}</span>
           </div>
           <span className={`font-num text-[13px] shrink-0 ${isIn ? "text-emerald-300" : "text-white"}`}>
-            {isIn ? "+" : "−"}◎{fmtSol4(row.amount)}
+            {isIn ? "+" : "−"}{IS_STELLAR_MODE ? "✦" : "◎"}{fmtSol4(row.amount)}
           </span>
         </div>
         <div className="flex items-center justify-between text-[11px] font-mono text-white/45">
@@ -720,7 +943,7 @@ function LedgerRow({ row }: any) {
         </div>
         <div className="col-span-1 text-right font-mono text-white/65">{fmtDur(row.duration)}</div>
         <div className="col-span-2 text-right">
-          <span className={`font-num text-[14px] ${isIn ? "text-emerald-300" : "text-white"}`}>{isIn ? "+" : "-"}◎{fmtSol4(row.amount)}</span>
+          <span className={`font-num text-[14px] ${isIn ? "text-emerald-300" : "text-white"}`}>{isIn ? "+" : "-"}{IS_STELLAR_MODE ? "✦" : "◎"}{fmtSol4(row.amount)}</span>
         </div>
         <div className="col-span-2 text-right">
           <a href="#" className="inline-flex items-center gap-1 font-mono text-[11px] text-violet-300/80 hover:text-white">
@@ -757,7 +980,7 @@ function RealLedgerRow({ record }: { record: ComplianceStreamRecord }) {
             <span className="font-mono text-[11.5px] text-white/65 truncate">{shortAccount}</span>
           </div>
           <span className={`font-num text-[13px] shrink-0 ${isIn ? "text-emerald-300" : "text-white"}`}>
-            {isIn ? "+" : "−"}{fmtSol4(record.depositedAmountSol)} SOL
+            {isIn ? "+" : "−"}{fmtSol4(record.depositedAmountSol)} {IS_STELLAR_MODE ? "XLM" : "SOL"}
           </span>
         </div>
         <div className="flex items-center justify-between text-[11px] font-mono text-white/45">
@@ -772,7 +995,7 @@ function RealLedgerRow({ record }: { record: ComplianceStreamRecord }) {
           </div>
           {record.explorerUrl ? (
             <a href={record.explorerUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-violet-300/70 hover:text-white">
-              Solscan <Icon name="arrow-up-right" size={9} />
+              {IS_STELLAR_MODE ? "Stellar Expert" : "Solscan"} <Icon name="arrow-up-right" size={9} />
             </a>
           ) : <span>-</span>}
         </div>
@@ -795,7 +1018,7 @@ function RealLedgerRow({ record }: { record: ComplianceStreamRecord }) {
         </div>
         <div className="col-span-2 text-right">
           <span className={`font-num text-[14px] ${isIn ? "text-emerald-300" : "text-white"}`}>
-            {isIn ? "+" : "-"}{fmtSol4(record.depositedAmountSol)} SOL
+            {isIn ? "+" : "-"}{fmtSol4(record.depositedAmountSol)} {IS_STELLAR_MODE ? "XLM" : "SOL"}
           </span>
         </div>
         <div className="col-span-2 text-right">

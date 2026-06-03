@@ -4,11 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { Icon } from "@/components/ui/Icon";
 import { DashboardBackground } from "@/components/ui/backgrounds";
+import { IS_STELLAR_MODE } from "@/lib/app-config";
 
 const CompliancePage = dynamic(() => import("@/components/compliance/CompliancePage"), { ssr: false });
 import { StellarStreamPanel } from "@/components/streams/StellarStreamPanel";
 import { useDripWallet } from "@/lib/solana/useDripWallet";
 import { useFreighterWallet } from "@/lib/stellar/useFreighterWallet";
+import { fetchStellarHistory, type StellarHistoryItem, EXPLORER_TX_URL as STELLAR_EXPLORER_TX_URL } from "@/lib/stellar/transactions";
+import { useStellarStreams, type UseStellarStreamsReturn } from "@/lib/stellar/useStellarStreams";
 import { useDripStreams } from "@/lib/solana/useDripStreams";
 import BN from "bn.js";
 import { PublicKey } from "@solana/web3.js";
@@ -27,6 +30,7 @@ import {
   NEW_STREAM_DEFAULTS,
   PROTOCOL_STATS,
   SETTINGS_DEFAULTS,
+  STELLAR_SETTINGS_DEFAULTS,
   STREAM_FILTERS,
   STREAM_TOKEN_OPTIONS,
   TOP_UP_DEFAULT_AMOUNT,
@@ -144,17 +148,25 @@ function DripMark({ size = 26 }: any) {
   return <img src="/logo.png" width={size} height={size} alt="Drip" style={{ display: "inline-block" }} />;
 }
 
-function Sidebar({ active, onChange, streams }: any) {
-  const items = DASHBOARD_NAV_ITEMS.map((item) => ({
-    ...item,
-    badge: item.hasStreamBadge ? streams.filter((s) => s.status === "streaming").length : undefined,
-  }));
+function Sidebar({ active, onChange, streams, stellarStreamCount }: any) {
+  const items = DASHBOARD_NAV_ITEMS
+    .filter((item) => !(IS_STELLAR_MODE && (item.k === "yield" || item.k === "agents")))
+    .map((item) => ({
+      ...item,
+      badge: item.hasStreamBadge
+        ? (stellarStreamCount !== undefined
+            ? (stellarStreamCount > 0 ? stellarStreamCount : undefined)
+            : streams.filter((s) => s.status === "streaming").length || undefined)
+        : undefined,
+    }));
   return (
     <aside className="hidden lg:flex flex-col w-[240px] shrink-0 border-r border-white/5 px-4 py-5 sticky top-0 h-screen">
-      <a href="#" className="flex items-center gap-2.5 px-2 py-1">
+      <a href="/" className="flex items-center gap-2.5 px-2 py-1">
         <DripMark />
         <span className="font-medium tracking-tight text-[16px]">Drip</span>
-        <span className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-violet-300/70 ml-1 px-1.5 py-0.5 rounded border border-violet-400/20">devnet</span>
+        <span className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-violet-300/70 ml-1 px-1.5 py-0.5 rounded border border-violet-400/20">
+          {IS_STELLAR_MODE ? "testnet" : "devnet"}
+        </span>
       </a>
       <nav className="mt-7 space-y-0.5">
         {items.map((it) => (
@@ -171,13 +183,23 @@ function Sidebar({ active, onChange, streams }: any) {
       </nav>
 
       <div className="mt-auto">
-        <div className="rounded-xl border border-violet-400/20 bg-violet-400/5 p-4">
-          <div className="text-[11px] uppercase tracking-[0.18em] text-violet-200/80 font-mono">Native SOL MVP</div>
-          <div className="mt-1.5 text-[13px] text-white/85">Streams native SOL on devnet. SPL token support is on the roadmap.</div>
-          <a href="https://faucet.solana.com" target="_blank" rel="noopener noreferrer" className="mt-3 w-full text-[12px] btn-ghost rounded-md py-1.5 hover:bg-violet-400/10 flex items-center justify-center gap-1.5">
-            <Icon name="zap" size={12} /> Get devnet SOL
-          </a>
-        </div>
+        {IS_STELLAR_MODE ? (
+          <div className="rounded-xl border border-sky-400/20 bg-sky-400/5 p-4">
+            <div className="text-[11px] uppercase tracking-[0.18em] text-sky-200/80 font-mono">Stellar Testnet</div>
+            <div className="mt-1.5 text-[13px] text-white/85">Native XLM streams via Soroban. Testnet only — no real funds.</div>
+            <a href="https://laboratory.stellar.org/#account-creator?network=test" target="_blank" rel="noopener noreferrer" className="mt-3 w-full text-[12px] btn-ghost rounded-md py-1.5 hover:bg-sky-400/10 flex items-center justify-center gap-1.5">
+              <Icon name="zap" size={12} /> Get testnet XLM
+            </a>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-violet-400/20 bg-violet-400/5 p-4">
+            <div className="text-[11px] uppercase tracking-[0.18em] text-violet-200/80 font-mono">Native SOL MVP</div>
+            <div className="mt-1.5 text-[13px] text-white/85">Streams native SOL on devnet. SPL token support is on the roadmap.</div>
+            <a href="https://faucet.solana.com" target="_blank" rel="noopener noreferrer" className="mt-3 w-full text-[12px] btn-ghost rounded-md py-1.5 hover:bg-violet-400/10 flex items-center justify-center gap-1.5">
+              <Icon name="zap" size={12} /> Get devnet SOL
+            </a>
+          </div>
+        )}
         <div className="mt-4 flex items-center gap-2 px-2 text-[11px] font-mono text-white/35">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse-dot" />
           <span>{PROTOCOL_STATS.rpcStatus} · slot {PROTOCOL_STATS.rpcSlotShort}</span>
@@ -188,7 +210,11 @@ function Sidebar({ active, onChange, streams }: any) {
 }
 
 function Topbar({ route, onNewStream, streamChain, freighter }: any) {
-  const { connected, connecting, publicKeyString, connect, disconnect, providerName } = useDripWallet();
+  // In Stellar mode we skip the Solana wallet entirely — IS_STELLAR_MODE is checked below.
+  const solanaWallet = useDripWallet();
+  const { connected, connecting, publicKeyString, connect, disconnect, providerName } = IS_STELLAR_MODE
+    ? { connected: false, connecting: false, publicKeyString: null, connect: null, disconnect: null, providerName: null }
+    : solanaWallet;
   const walletLabel = connected ? shortWalletAddress(publicKeyString) : connecting ? "Connecting..." : "Connect";
   const walletMeta = connected ? providerName ?? "Solana wallet" : "Solana signer";
 
@@ -197,7 +223,7 @@ function Topbar({ route, onNewStream, streamChain, freighter }: any) {
     void connect?.();
   };
 
-  const isStellar = streamChain === "stellar-testnet";
+  const isStellar = IS_STELLAR_MODE || streamChain === "stellar-testnet";
 
   const stellarLabel = freighter?.connecting
     ? "Connecting..."
@@ -270,7 +296,9 @@ function Topbar({ route, onNewStream, streamChain, freighter }: any) {
 }
 
 function MobileBottomNav({ active, onChange }: any) {
-  const items = DASHBOARD_NAV_ITEMS.slice(0, 5);
+  const items = DASHBOARD_NAV_ITEMS
+    .filter((item) => !(IS_STELLAR_MODE && (item.k === "yield" || item.k === "agents")))
+    .slice(0, 5);
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-[#07060f]/95 backdrop-blur-md safe-area-inset-bottom">
       <div className="flex items-center">
@@ -306,6 +334,7 @@ function PageHeader({ eyebrow, title, sub, right }: any) {
 }
 
 function WalletDemoNotice({ error, onConnect }: any) {
+  if (IS_STELLAR_MODE) return null;
   return (
     <div className="rounded-2xl border border-violet-400/25 bg-violet-400/[0.06] px-4 py-3 flex items-center gap-3 flex-wrap">
       <div className="w-8 h-8 rounded-full bg-violet-400/15 text-violet-200 flex items-center justify-center">
@@ -328,7 +357,347 @@ function WalletDemoNotice({ error, onConnect }: any) {
 // =========================================================================
 // DASHBOARD page
 // =========================================================================
-function DashboardPage({ streams, onNewStream, onGoTo, walletConnected, walletError, onConnectWallet, onRequireWallet }: any) {
+// =========================================================================
+// STELLAR DASHBOARD — replaces DashboardPage in Stellar mode.
+// Derives stats from the local stream registry + on-chain state.
+// =========================================================================
+const STELLAR_FEATURE_CARDS = [
+  { icon: "plus-circle",  title: "Create XLM streams",    desc: "Stream native XLM to any Stellar address. Set total amount and duration — funds vest per second via Soroban." },
+  { icon: "pause-circle", title: "Pause & resume",         desc: "Halt vesting instantly on-chain. No funds are lost — resume anytime with a single Freighter signature." },
+  { icon: "download",     title: "Withdraw vested XLM",    desc: "Receiver withdraws any vested portion at any time during or after the stream — fully self-custodial." },
+  { icon: "x-circle",     title: "Cancel & reclaim",       desc: "Payer can cancel early. Vested XLM goes to receiver; unvested remainder returns to payer automatically." },
+];
+
+function StellarDashboard({ walletConnected, onConnectWallet, onNewStream, onGoTo, stellarStreams }: any) {
+  const ss: UseStellarStreamsReturn | undefined = stellarStreams;
+  const trackedStreams = ss?.streams ?? [];
+  const hasStreams = trackedStreams.length > 0;
+
+  const totalXlm = trackedStreams.reduce((a, s) => {
+    try { return a + Number(BigInt(s.amountStroops || "0")) / 10_000_000; } catch { return a; }
+  }, 0);
+  const withdrawnXlm = trackedStreams.reduce((a, s) => {
+    try { return a + Number(BigInt(s.onChainState?.withdrawn || "0")) / 10_000_000; } catch { return a; }
+  }, 0);
+  const activeCount    = trackedStreams.filter(s => s.onChainState?.status === "Active").length;
+  const pausedCount    = trackedStreams.filter(s => s.onChainState?.status === "Paused").length;
+  const cancelledCount = trackedStreams.filter(s => s.onChainState?.status === "Cancelled" || s.onChainState?.status === "Completed").length;
+  const loadingCount   = trackedStreams.filter(s => s.isLoading).length;
+
+  const contractConfigured = !!(
+    process.env.NEXT_PUBLIC_STELLAR_CONTRACT_ID &&
+    process.env.NEXT_PUBLIC_STELLAR_CONTRACT_ID !== "REPLACE_WITH_STELLAR_TESTNET_CONTRACT_ID"
+  );
+
+  return (
+    <div className="space-y-7">
+      <PageHeader
+        eyebrow="01  -  Overview"
+        title={walletConnected ? <>Your Stellar streams.</> : <>Real-time XLM payment streaming.</>}
+        sub={
+          walletConnected
+            ? "Track and manage your XLM streams on Stellar Testnet via Soroban."
+            : "Native XLM · Soroban smart contracts · Stellar Testnet · no real funds"
+        }
+        right={walletConnected ? (
+          <button onClick={onNewStream} className="hidden sm:flex btn-primary rounded-full px-5 py-3 text-[13.5px] font-medium text-white items-center gap-2">
+            <Icon name="zap" size={14} /> New stream
+          </button>
+        ) : undefined}
+      />
+
+      {/* ═══════════════════════════════════════════════════════
+          STATE A — FREIGHTER NOT CONNECTED
+      ═══════════════════════════════════════════════════════ */}
+      {!walletConnected && (
+        <>
+          {/* Full-width hero card */}
+          <section className="grad-border glass-strong rounded-3xl p-1.5 relative overflow-hidden">
+            <div
+              className="absolute -top-28 -right-28 w-80 h-80 rounded-full opacity-25 pointer-events-none"
+              style={{ background: "radial-gradient(circle, rgba(56,189,248,0.55) 0%, transparent 70%)" }}
+            />
+            <div
+              className="absolute -bottom-24 -left-20 w-64 h-64 rounded-full opacity-20 pointer-events-none"
+              style={{ background: "radial-gradient(circle, rgba(139,92,246,0.6) 0%, transparent 70%)" }}
+            />
+            <div className="rounded-[22px] bg-gradient-to-br from-[#100e26]/95 to-[#07060f] p-6 sm:p-10 relative">
+              <div className="grid lg:grid-cols-12 gap-8 items-start">
+
+                {/* Left — headline + CTA */}
+                <div className="lg:col-span-7 space-y-5">
+
+                  <h2 className="text-[26px] sm:text-[34px] lg:text-[40px] tracking-tight leading-[1.07] text-white">
+                    Connect Freighter<br className="hidden sm:block" /> to start streaming XLM.
+                  </h2>
+                  <p className="text-[14.5px] text-white/55 leading-relaxed max-w-[500px]">
+                    Create, track, and manage Stellar Testnet payment streams using Soroban smart contracts. Funds vest continuously — pause, withdraw, or cancel anytime on-chain.
+                  </p>
+                  <div className="flex flex-wrap gap-3 pt-1">
+                    <button
+                      onClick={onConnectWallet}
+                      className="btn-primary rounded-full px-6 py-3 text-[14px] font-medium text-white inline-flex items-center gap-2"
+                    >
+                      <Icon name="fingerprint" size={15} /> Connect Freighter
+                    </button>
+                    <a
+                      href="https://freighter.app"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-ghost rounded-full px-6 py-3 text-[13.5px] text-white/65 inline-flex items-center gap-2"
+                    >
+                      Get Freighter <Icon name="arrow-up-right" size={13} />
+                    </a>
+                  </div>
+                </div>
+
+                {/* Right — network info panel */}
+                <div className="lg:col-span-5">
+                  <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-5">
+                    <div className="text-[10px] uppercase tracking-[0.22em] text-white/30 font-mono mb-4">Network info</div>
+                    <div className="space-y-3">
+                      {[
+                        { k: "Network",    v: "Stellar Testnet",               cls: "text-sky-300"     },
+                        { k: "Asset",      v: "Native XLM",                    cls: "text-white/65"    },
+                        { k: "Contract",   v: contractConfigured ? "Configured ✓" : "Not configured",
+                                           cls: contractConfigured ? "text-emerald-300" : "text-amber-300" },
+                        { k: "Signer",     v: "Freighter extension",            cls: "text-white/55"    },
+                        { k: "Mode",       v: "Testnet only · no real funds",   cls: "text-white/40"    },
+                      ].map(({ k, v, cls }) => (
+                        <div key={k} className="flex items-start justify-between gap-4">
+                          <span className="text-[11.5px] text-white/30 font-mono shrink-0 pt-0.5">{k}</span>
+                          <span className={`text-[12px] font-mono text-right ${cls}`}>{v}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-5 pt-4 border-t border-white/5">
+                      <a
+                        href="https://laboratory.stellar.org/#account-creator?network=test"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full btn-ghost rounded-xl py-2 text-[12px] text-sky-300/70 hover:text-sky-200 flex items-center justify-center gap-1.5 transition"
+                      >
+                        <Icon name="zap" size={12} /> Get free testnet XLM
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Feature cards */}
+          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {STELLAR_FEATURE_CARDS.map((card) => (
+              <div key={card.title} className="rounded-2xl border border-white/8 bg-white/[0.02] p-5">
+                <div className="w-10 h-10 rounded-xl bg-sky-400/10 flex items-center justify-center text-sky-300 mb-4">
+                  <Icon name={card.icon} size={17} />
+                </div>
+                <div className="text-[14px] text-white font-medium leading-snug">{card.title}</div>
+                <div className="mt-1.5 text-[12.5px] text-white/40 leading-relaxed">{card.desc}</div>
+              </div>
+            ))}
+          </section>
+        </>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════
+          LOADING SPINNER (while fetching on-chain state)
+      ═══════════════════════════════════════════════════════ */}
+      {walletConnected && ss?.loading && (
+        <div className="flex items-center gap-2 text-[12px] font-mono text-sky-300/70 px-1">
+          <span className="inline-block w-3 h-3 rounded-full border-2 border-sky-400 border-t-transparent animate-spin shrink-0" />
+          Loading on-chain stream states…
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════
+          STATE B — CONNECTED BUT NO TRACKED STREAMS
+      ═══════════════════════════════════════════════════════ */}
+      {walletConnected && !hasStreams && !ss?.loading && (
+        <>
+          {/* Zero-state metric row */}
+          <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { icon: "layers",   label: "Tracked streams",  value: "0",       sub: "no streams yet"     },
+              { icon: "waves",    label: "Active streams",   value: "0",       sub: "create one below"   },
+              { icon: "coins",    label: "Total XLM locked", value: "0.0000",  sub: "across all streams" },
+              { icon: "download", label: "Withdrawn XLM",    value: "0.0000",  sub: "nothing released"   },
+            ].map((m) => (
+              <div key={m.label} className="rounded-2xl border border-white/8 bg-white/[0.02] p-5">
+                <div className="w-9 h-9 rounded-xl bg-white/[0.03] flex items-center justify-center text-white/25 mb-4">
+                  <Icon name={m.icon} size={16} />
+                </div>
+                <div className="text-[10px] uppercase tracking-[0.18em] text-white/30 font-mono">{m.label}</div>
+                <div className="mt-2 text-[30px] font-num leading-none tracking-[-0.02em] text-white/20">{m.value}</div>
+                <div className="mt-1.5 text-[12px] text-white/25">{m.sub}</div>
+              </div>
+            ))}
+          </section>
+
+          {/* CTA card */}
+          <section className="rounded-2xl border border-sky-400/15 bg-sky-400/[0.03] p-8 sm:p-10">
+            <div className="max-w-xl">
+              <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.18em] text-sky-300/65 mb-3">
+                <Icon name="waves" size={12} /> Getting started
+              </div>
+              <h3 className="text-[22px] sm:text-[26px] tracking-tight text-white leading-snug">
+                No tracked Stellar streams yet.
+              </h3>
+              <p className="mt-2.5 text-[13.5px] text-white/50 leading-relaxed max-w-[480px]">
+                Create a new XLM stream or load an existing stream ID. Your streams will appear here automatically and persist across sessions.
+              </p>
+              <div className="flex flex-wrap gap-3 mt-5">
+                <button
+                  onClick={onNewStream}
+                  className="btn-primary rounded-full px-6 py-3 text-[14px] font-medium text-white inline-flex items-center gap-2"
+                >
+                  <Icon name="plus" size={14} /> New XLM stream
+                </button>
+                <button
+                  onClick={() => onGoTo("streams")}
+                  className="btn-ghost rounded-full px-6 py-3 text-[13.5px] text-white/65 inline-flex items-center gap-2"
+                >
+                  Load stream ID <Icon name="arrow-right" size={13} />
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {/* Feature cards */}
+          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {STELLAR_FEATURE_CARDS.map((card) => (
+              <div key={card.title} className="rounded-2xl border border-white/8 bg-white/[0.02] p-5">
+                <div className="w-10 h-10 rounded-xl bg-white/[0.04] flex items-center justify-center text-white/40 mb-4">
+                  <Icon name={card.icon} size={17} />
+                </div>
+                <div className="text-[14px] text-white font-medium leading-snug">{card.title}</div>
+                <div className="mt-1.5 text-[12.5px] text-white/35 leading-relaxed">{card.desc}</div>
+              </div>
+            ))}
+          </section>
+        </>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════
+          STATE C — CONNECTED WITH TRACKED STREAMS
+      ═══════════════════════════════════════════════════════ */}
+      {walletConnected && hasStreams && (
+        <>
+          {/* Full-width stats grid */}
+          <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <SummaryTile
+              icon="layers"
+              label="Tracked streams"
+              value={`${trackedStreams.length}`}
+              sub={loadingCount > 0 ? `${loadingCount} syncing…` : "in local registry"}
+              onClick={() => onGoTo("streams")}
+            />
+            <SummaryTile
+              icon="waves"
+              label="Active streams"
+              value={`${activeCount}`}
+              sub={`${pausedCount} paused · ${cancelledCount} closed`}
+              onClick={() => onGoTo("streams")}
+            />
+            <SummaryTile
+              icon="coins"
+              label="Total XLM locked"
+              value={totalXlm.toFixed(4)}
+              sub="across all tracked streams"
+              accent
+            />
+            <SummaryTile
+              icon="download"
+              label="Withdrawn XLM"
+              value={withdrawnXlm.toFixed(4)}
+              sub="released to receivers"
+            />
+          </section>
+
+          {/* Stream mini grid */}
+          <section>
+            <div className="flex items-end justify-between mb-4 flex-wrap gap-2">
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.2em] text-sky-300/70 font-mono">Your streams</div>
+                <h3 className="mt-1.5 text-[20px] tracking-tight">Active &amp; recent.</h3>
+              </div>
+              <button
+                onClick={() => onGoTo("streams")}
+                className="text-[12.5px] text-white/50 hover:text-white flex items-center gap-1 transition"
+              >
+                Manage all <Icon name="arrow-right" size={12} />
+              </button>
+            </div>
+            <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              {trackedStreams.slice(0, 6).map((s) => {
+                const xlm = (() => {
+                  try { return (Number(BigInt(s.amountStroops || "0")) / 10_000_000).toFixed(2); }
+                  catch { return "—"; }
+                })();
+                const wdn = (() => {
+                  try { return (Number(BigInt(s.onChainState?.withdrawn || "0")) / 10_000_000).toFixed(4); }
+                  catch { return "0.0000"; }
+                })();
+                const status = s.isLoading ? "loading…" : (s.onChainState?.status ?? s.lastKnownStatus);
+                const statusCls =
+                  status === "Active"   ? "text-emerald-300" :
+                  status === "Paused"   ? "text-amber-300"   :
+                  s.isLoading           ? "text-white/25"    : "text-white/35";
+                return (
+                  <div
+                    key={s.streamId}
+                    className="rounded-xl border border-white/5 bg-white/[0.02] p-4 flex items-start gap-3 hover:border-sky-400/20 transition"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-sky-400/10 flex items-center justify-center text-sky-300 shrink-0 mt-0.5">
+                      <Icon name="waves" size={13} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className="text-[13px] text-white font-mono">Stream #{s.streamId}</span>
+                        <span className={`text-[10px] font-mono ${statusCls}`}>{status}</span>
+                      </div>
+                      <div className="text-[11px] font-mono text-white/30 truncate mt-0.5">
+                        {s.receiver ? `→ ${s.receiver.slice(0, 8)}…${s.receiver.slice(-4)}` : "—"}
+                      </div>
+                      <div className="mt-2.5 flex items-center justify-between text-[11px] font-mono">
+                        <span className="text-sky-300">{xlm} XLM total</span>
+                        <span className="text-white/25">{wdn} withdrawn</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {trackedStreams.length > 6 && (
+              <button
+                onClick={() => onGoTo("streams")}
+                className="mt-3 w-full rounded-xl border border-white/5 py-2.5 text-[12.5px] text-white/40 hover:text-white hover:border-white/15 transition font-mono"
+              >
+                + {trackedStreams.length - 6} more streams — view all
+              </button>
+            )}
+          </section>
+        </>
+      )}
+    </div>
+  );
+}
+
+function DashboardPage({ streams, onNewStream, onGoTo, walletConnected, walletError, onConnectWallet, onRequireWallet, stellarStreams }: any) {
+  // Stellar mode: derive real stats from tracked streams instead of Solana mock data
+  if (IS_STELLAR_MODE) {
+    return (
+      <StellarDashboard
+        walletConnected={walletConnected}
+        onConnectWallet={onConnectWallet}
+        onNewStream={onNewStream}
+        onGoTo={onGoTo}
+        stellarStreams={stellarStreams}
+      />
+    );
+  }
+
   const inSum = streams.filter((s) => s.dir === "in" && s.status === "streaming").reduce((a, s) => a + s.rate, 0);
   const outSum = streams.filter((s) => s.dir === "out" && s.status === "streaming").reduce((a, s) => a + s.rate, 0);
   const net = inSum - outSum;
@@ -353,7 +722,9 @@ function DashboardPage({ streams, onNewStream, onGoTo, walletConnected, walletEr
       <PageHeader
         eyebrow="01  -  Overview"
         title={<>Your money, in motion.</>}
-        sub="The Net Flow Engine settles your incoming and outgoing streams every Solana block. Everything below ticks live."
+        sub={IS_STELLAR_MODE
+          ? "The Net Flow Engine settles your incoming and outgoing streams on Stellar Testnet. Everything below ticks live."
+          : "The Net Flow Engine settles your incoming and outgoing streams every Solana block. Everything below ticks live."}
         right={
           <button onClick={onNewStream} className="hidden sm:flex btn-primary rounded-full px-5 py-3 text-[13.5px] font-medium text-white items-center gap-2">
             <Icon name="zap" size={14} /> Create new stream
@@ -401,7 +772,10 @@ function DashboardPage({ streams, onNewStream, onGoTo, walletConnected, walletEr
 
           <div className="mt-8 grid lg:grid-cols-12 gap-8 items-end">
             <div className="lg:col-span-7">
-              <div className="text-[10.5px] uppercase tracking-[0.2em] text-white/40 font-mono">Streaming balance · SOL <span className="text-white/25 normal-case tracking-normal text-[9px]">(devnet demo)</span></div>
+              <div className="text-[10.5px] uppercase tracking-[0.2em] text-white/40 font-mono">
+                Streaming balance · {IS_STELLAR_MODE ? "XLM" : "SOL"}{" "}
+                <span className="text-white/25 normal-case tracking-normal text-[9px]">({IS_STELLAR_MODE ? "testnet demo" : "devnet demo"})</span>
+              </div>
               <div className="mt-3 flex items-baseline gap-1 num-stable">
                 <span className="text-white/40 text-[22px] sm:text-[30px] lg:text-[36px] font-num">◎</span>
                 <span className="text-iri text-[44px] sm:text-[58px] lg:text-[72px] font-num leading-[0.95] tracking-[-0.025em]">{whole}</span>
@@ -414,14 +788,14 @@ function DashboardPage({ streams, onNewStream, onGoTo, walletConnected, walletEr
               <div className="mt-5 flex items-center flex-wrap gap-2">
                 <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-400/10 text-emerald-300 text-[12.5px] font-mono">
                   <Icon name="arrow-down-left" size={12} />
-                  + ◎{(inSum).toFixed(6)} / sec <span className="text-emerald-300/60 ml-1">incoming</span>
+                  + {IS_STELLAR_MODE ? "✦" : "◎"}{(inSum).toFixed(6)} / sec <span className="text-emerald-300/60 ml-1">incoming</span>
                 </span>
                 <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-400/10 text-rose-300 text-[12.5px] font-mono">
                   <Icon name="arrow-up-right" size={12} />
-                  - ◎{(outSum).toFixed(6)} / sec <span className="text-rose-300/60 ml-1">outgoing</span>
+                  - {IS_STELLAR_MODE ? "✦" : "◎"}{(outSum).toFixed(6)} / sec <span className="text-rose-300/60 ml-1">outgoing</span>
                 </span>
                 <span className={`px-3 py-1.5 rounded-full text-[12.5px] font-mono border ${positive ? "border-emerald-400/30 text-emerald-300" : "border-rose-400/30 text-rose-300"}`}>
-                  Net: {positive ? "+" : ""}{net.toFixed(6)} SOL/sec ~{positive ? "+" : ""}◎{(net * 86400).toFixed(4)}/day
+                  Net: {positive ? "+" : ""}{net.toFixed(6)} {IS_STELLAR_MODE ? "XLM" : "SOL"}/sec ~{positive ? "+" : ""}{IS_STELLAR_MODE ? "✦" : "◎"}{(net * 86400).toFixed(4)}/day
                 </span>
               </div>
             </div>
@@ -438,8 +812,8 @@ function DashboardPage({ streams, onNewStream, onGoTo, walletConnected, walletEr
         <SummaryTile
           icon="layers"
           label="Total value streamed"
-          value={`◎${fmtUSD(totalStreamed, 4)}`}
-          sub="lifetime · devnet demo data"
+          value={`${IS_STELLAR_MODE ? "✦" : "◎"}${fmtUSD(totalStreamed, 4)}`}
+          sub={`lifetime · ${IS_STELLAR_MODE ? "testnet" : "devnet"} demo data`}
           accent
         />
         <SummaryTile
@@ -449,13 +823,15 @@ function DashboardPage({ streams, onNewStream, onGoTo, walletConnected, walletEr
           sub={`${streams.length - activeCount} paused/completed`}
           onClick={() => onGoTo("streams")}
         />
-        <SummaryTile
-          icon="sprout"
-          label="Yield generated"
-          value={`◎${fmtUSD(yieldEarned, 4)}`}
-          sub="lifetime · yield routing roadmap"
-          onClick={() => onGoTo("yield")}
-        />
+        {!IS_STELLAR_MODE && (
+          <SummaryTile
+            icon="sprout"
+            label="Yield generated"
+            value={`◎${fmtUSD(yieldEarned, 4)}`}
+            sub="lifetime · yield routing roadmap"
+            onClick={() => onGoTo("yield")}
+          />
+        )}
       </section>
 
       {/* Mini active streams */}
@@ -563,7 +939,7 @@ function FlowSparkline({ net }: any) {
 // =========================================================================
 // STREAMS page
 // =========================================================================
-function StreamsPage({ streams, setStreams, onNewStream, walletConnected, onRequireWallet, streamsLoading, streamsError, onRefresh, onWithdraw, onPause, onResume, onCancelStream, streamActions, streamChain, onChainChange, freighter }: any) {
+function StreamsPage({ streams, setStreams, onNewStream, walletConnected, onRequireWallet, streamsLoading, streamsError, onRefresh, onWithdraw, onPause, onResume, onCancelStream, streamActions, streamChain, onChainChange, freighter, stellarStreams }: any) {
   const [filter, setFilter] = useState("all");
   const [topUpId, setTopUpId] = useState<string | null>(null);
 
@@ -595,7 +971,9 @@ function StreamsPage({ streams, setStreams, onNewStream, walletConnected, onRequ
       <PageHeader
         eyebrow="02 - Streams"
         title={<>Manage every drop.</>}
-        sub="Create and manage streams on Solana Devnet and Stellar Testnet. Each chain is isolated — no bridge, no shared liquidity."
+        sub={IS_STELLAR_MODE
+          ? "Create and manage XLM streams on Stellar Testnet via Soroban. Testnet only — no real funds, no bridge."
+          : "Create and manage streams on Solana Devnet and Stellar Testnet. Each chain is isolated — no bridge, no shared liquidity."}
         right={
           streamChain === "solana-devnet" ? (
             <div className="flex items-center gap-2">
@@ -628,14 +1006,14 @@ function StreamsPage({ streams, setStreams, onNewStream, walletConnected, onRequ
         }
       />
 
-      {/* Chain selector */}
-      <ChainSelector chain={streamChain} onChange={onChainChange} />
+      {/* Chain selector — hidden in Stellar-only mode */}
+      {!IS_STELLAR_MODE && <ChainSelector chain={streamChain} onChange={onChainChange} />}
 
       {/* ── Stellar Testnet tab ── */}
-      {streamChain === "stellar-testnet" && <StellarStreamPanel freighter={freighter} />}
+      {(IS_STELLAR_MODE || streamChain === "stellar-testnet") && <StellarStreamPanel freighter={freighter} stellarStreams={stellarStreams} />}
 
       {/* ── Solana Devnet tab ── */}
-      {streamChain === "solana-devnet" && (
+      {!IS_STELLAR_MODE && streamChain === "solana-devnet" && (
         <>
           {streamsError && (
             <div className="rounded-xl border border-rose-500/30 bg-rose-500/[0.06] px-4 py-3 flex items-center gap-3">
@@ -1021,7 +1399,9 @@ function YieldPage({ streams, walletConnected, onRequireWallet }: any) {
       <PageHeader
         eyebrow="03  -  Capital efficiency"
         title={<>Idle escrow, working overtime.</>}
-        sub="Funds locked in your active stream contracts aren't sitting still. They're routed into Raydium concentrated liquidity vaults and re-balanced every Solana epoch."
+        sub={IS_STELLAR_MODE
+          ? "Yield routing is a Solana-only feature and is not available on Stellar Testnet. Stream data is shown below for reference."
+          : "Funds locked in your active stream contracts aren't sitting still. They're routed into Raydium concentrated liquidity vaults and re-balanced every Solana epoch."}
       />
 
       <section className="grad-border glass-strong rounded-3xl p-1.5 relative overflow-hidden">
@@ -1132,56 +1512,362 @@ function PoolRow({ name, share, apy, tvl }: any) {
 // =========================================================================
 // HISTORY page
 // =========================================================================
-function HistoryPage() {
+type FreighterState = ReturnType<typeof useFreighterWallet>;
+
+function HistoryPage({ freighter: freighterProp, stellarStreams }: { freighter?: FreighterState; stellarStreams?: UseStellarStreamsReturn }) {
   const [filter, setFilter] = useState("all");
-  const visible = HISTORY_DETAILED.filter(h => filter === "all" || h.kind === filter);
-  const totalStreamed = HISTORY_DETAILED.reduce((a, h) => a + h.final, 0);
+
+  // Stellar mode: receive wallet state from the top-level DashboardApp via prop.
+  const walletAddress = freighterProp?.address ?? null;
+  const walletConnected = freighterProp?.connected ?? false;
+
+  const [stellarEvents, setStellarEvents] = useState<StellarHistoryItem[]>([]);
+  const [stellarLoading, setStellarLoading] = useState(false);
+  const [stellarError, setStellarError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!IS_STELLAR_MODE || !walletAddress) {
+      setStellarEvents([]);
+      setStellarLoading(false);
+      return;
+    }
+    setStellarLoading(true);
+    setStellarError(null);
+    fetchStellarHistory(walletAddress).then(({ items, error }) => {
+      setStellarEvents(items);
+      setStellarError(error);
+      setStellarLoading(false);
+    });
+  }, [walletAddress]);
+
+  // ── Derive history rows from tracked stream state ──────────────────────────
+  // When getEvents returns no events (scan window too old, or contract doesn't
+  // emit searchable events yet), synthesise one row per tracked stream using
+  // the latest on-chain state from get_stream.  These rows carry source="tracked"
+  // so we can distinguish them and avoid double-counting with real event rows.
+  const derivedRows = useMemo<StellarHistoryItem[]>(() => {
+    if (!IS_STELLAR_MODE) return [];
+    const tracked = stellarStreams?.streams ?? [];
+    if (tracked.length === 0) return [];
+
+    // Build a set of stream IDs already covered by real events to avoid duplication
+    const coveredIds = new Set(
+      stellarEvents
+        .map(e => e.streamId.replace(/^#/, ""))
+        .filter(Boolean),
+    );
+
+    return tracked
+      .filter(s => !coveredIds.has(s.streamId))
+      .map((s): StellarHistoryItem => {
+        const status = s.onChainState?.status ?? s.lastKnownStatus ?? "unknown";
+        const isCompleted = status === "Completed";
+        const isCancelled = status === "Cancelled";
+
+        // Human-readable event type label
+        const eventType =
+          isCompleted ? "Completed stream" :
+          isCancelled ? "Cancelled stream" :
+          status === "Paused" ? "Paused stream" :
+          status === "Active" ? "Active stream" :
+          `Stream (${status})`;
+
+        // kind drives stat card counts: "ended" = Completed, "cancelled" = Cancelled,
+        // "active" is used for Active/Paused (not closed, not counted in closed stats)
+        const kind: StellarHistoryItem["kind"] =
+          isCompleted ? "ended" :
+          isCancelled ? "cancelled" :
+          "active";
+
+        // Amount in XLM
+        const amountXlm = (() => {
+          try { return Number(BigInt(s.amountStroops || "0")) / 10_000_000; }
+          catch { return 0; }
+        })();
+
+        const withdrawnXlm = (() => {
+          try { return Number(BigInt(s.onChainState?.withdrawn || "0")) / 10_000_000; }
+          catch { return 0; }
+        })();
+
+        // Use whichever is more meaningful: for closed streams show total,
+        // for active show withdrawn (vested so far)
+        const displayXlm = (isCompleted || isCancelled) ? amountXlm : withdrawnXlm;
+
+        // Timestamp from registry or on-chain fields
+        const rawAt = s.createdAt ?? s.lastLoadedAt ?? "";
+        const atStr = rawAt
+          ? (() => {
+              try {
+                const d = new Date(rawAt);
+                return (
+                  d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
+                  " - " +
+                  d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })
+                );
+              } catch { return rawAt; }
+            })()
+          : "—";
+
+        // Explorer URL: prefer createdTxHash (exact transaction), fall back to contract
+        const contractId = process.env.NEXT_PUBLIC_STELLAR_CONTRACT_ID ?? "";
+        const explorerUrl = s.createdTxHash
+          ? `https://stellar.expert/explorer/testnet/tx/${s.createdTxHash}`
+          : contractId
+            ? `https://stellar.expert/explorer/testnet/contract/${contractId}`
+            : "#";
+
+        const shortReceiver = s.receiver
+          ? `${s.receiver.slice(0, 6)}…${s.receiver.slice(-4)}`
+          : `stream-${s.streamId}`;
+
+        return {
+          id: `tracked_${s.streamId}`,
+          kind,
+          eventType,
+          streamId: `#${s.streamId}`,
+          counterparty: shortReceiver,
+          counterpartyFull: s.receiver ?? "",
+          finalXlm: displayXlm,
+          at: atStr,
+          durationSec: 0,
+          txHash: s.createdTxHash ?? "",
+          explorerUrl,
+        };
+      });
+  }, [stellarEvents, stellarStreams]);
+
+  // Merge: real events first, then derived rows for streams not already represented
+  const allStellarItems = useMemo<StellarHistoryItem[]>(() => {
+    return [...stellarEvents, ...derivedRows];
+  }, [stellarEvents, derivedRows]);
+
+  // Whether derived rows are filling in for missing events
+  const usingDerivedFallback = IS_STELLAR_MODE && stellarEvents.length === 0 && derivedRows.length > 0;
+
+  // In Stellar mode use the merged list; Solana mode uses mock
+  const visible = IS_STELLAR_MODE
+    ? allStellarItems
+    : HISTORY_DETAILED.filter(h => filter === "all" || h.kind === filter);
+
+  const totalCount = IS_STELLAR_MODE ? allStellarItems.length : HISTORY_DETAILED.length;
+  const endedCount = IS_STELLAR_MODE
+    ? allStellarItems.filter(h => h.kind === "ended").length
+    : HISTORY_DETAILED.filter(h => h.kind === "ended").length;
+  const cancelledCount = IS_STELLAR_MODE
+    ? allStellarItems.filter(h => h.kind === "cancelled").length
+    : HISTORY_DETAILED.filter(h => h.kind === "cancelled").length;
+
+  const hasLifecycleEvents = IS_STELLAR_MODE;
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="04  -  Ledger"
         title={<>Every stream, on the record.</>}
-        sub="A transparent, immutable log of all completed and cancelled streams. Each row links to Solscan."
+        sub={IS_STELLAR_MODE
+          ? "Stream lifecycle log — real Soroban events and tracked on-chain state. Each row links to Stellar Expert."
+          : "A transparent, immutable log of all completed and cancelled streams. Each row links to Solscan."}
         right={
-          <div className="flex items-center gap-1 p-1 rounded-full border border-white/10 bg-white/[0.02]">
-            {HISTORY_FILTERS.map((filterOption) => {
-              const t = {
-                ...filterOption,
-                n: filterOption.k === "all" ? HISTORY_DETAILED.length : HISTORY_DETAILED.filter((h) => h.kind === filterOption.k).length,
-              };
-              return (
-              <button key={t.k} onClick={() => setFilter(t.k)} className={`px-3 py-1.5 rounded-full text-[12px] border transition ${filter === t.k ? "tab-active" : "border-transparent text-white/55 hover:text-white"}`}>
-                {t.l} <span className="text-white/40 ml-0.5">{t.n}</span>
-              </button>
-            );})}
-          </div>
+          !IS_STELLAR_MODE ? (
+            <div className="flex items-center gap-1 p-1 rounded-full border border-white/10 bg-white/[0.02]">
+              {HISTORY_FILTERS.map((filterOption) => {
+                const t = {
+                  ...filterOption,
+                  n: filterOption.k === "all" ? HISTORY_DETAILED.length : HISTORY_DETAILED.filter((h) => h.kind === filterOption.k).length,
+                };
+                return (
+                <button key={t.k} onClick={() => setFilter(t.k)} className={`px-3 py-1.5 rounded-full text-[12px] border transition ${filter === t.k ? "tab-active" : "border-transparent text-white/55 hover:text-white"}`}>
+                  {t.l} <span className="text-white/40 ml-0.5">{t.n}</span>
+                </button>
+              );})}
+            </div>
+          ) : undefined
         }
       />
 
+      {/* Loading spinner */}
+      {IS_STELLAR_MODE && stellarLoading && (
+        <div className="rounded-xl border border-white/8 bg-white/[0.02] px-5 py-3 flex items-center gap-3 text-[13px] text-white/65">
+          <Icon name="loader-2" size={14} className="animate-spin text-sky-300" />
+          Loading Stellar Testnet history…
+        </div>
+      )}
+
+      {/* Fetch error */}
+      {IS_STELLAR_MODE && stellarError && (
+        <div className="rounded-xl border border-rose-400/25 bg-rose-400/5 px-5 py-3 text-[13px] text-rose-200 flex items-center gap-2">
+          <Icon name="triangle-alert" size={13} className="text-rose-300 shrink-0" />
+          {stellarError}
+        </div>
+      )}
+
+      {/* Not connected */}
+      {IS_STELLAR_MODE && !walletConnected && !stellarLoading && (
+        <div className="rounded-xl border border-white/8 bg-white/[0.02] px-5 py-4 flex items-center gap-3 text-[13px] text-white/55">
+          <Icon name="fingerprint" size={14} className="text-white/35" />
+          Connect Freighter to load your Stellar Testnet history.
+        </div>
+      )}
+
+      {/* Derived-fallback notice */}
+      {IS_STELLAR_MODE && usingDerivedFallback && (
+        <div className="rounded-xl border border-sky-400/15 bg-sky-400/[0.04] px-4 py-2.5 flex items-center gap-2 text-[11.5px] font-mono text-sky-300/70">
+          <Icon name="info" size={12} className="shrink-0" />
+          Showing tracked on-chain stream state — recent contract events were not found in the scanned ledger window.
+        </div>
+      )}
+
+      {/* Stats */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <YieldStat icon="layers" label="Lifetime streamed" value={`$${totalStreamed.toFixed(2)}`} sub={`across ${HISTORY_DETAILED.length} closed streams`} tone="up" />
-        <YieldStat icon="check-circle-2" label="Completed naturally" value={`${HISTORY_DETAILED.filter(h => h.kind === "ended").length}`} sub="ran to scheduled end" />
-        <YieldStat icon="x-circle" label="Cancelled early" value={`${HISTORY_DETAILED.filter(h => h.kind === "cancelled").length}`} sub="terminated mid-stream" />
+        <YieldStat
+          icon="layers"
+          label={IS_STELLAR_MODE ? "Stream records" : "Lifetime streamed"}
+          value={IS_STELLAR_MODE ? `${totalCount}` : `$${HISTORY_DETAILED.reduce((a, h) => a + h.final, 0).toFixed(2)}`}
+          sub={IS_STELLAR_MODE
+            ? (usingDerivedFallback ? "from tracked stream state" : "contract events in range")
+            : `across ${totalCount} closed streams`}
+          tone="up"
+        />
+        <YieldStat
+          icon="check-circle-2"
+          label={IS_STELLAR_MODE ? "Completed" : "Completed naturally"}
+          value={`${endedCount}`}
+          sub={IS_STELLAR_MODE ? "streams that ran to end" : "ran to scheduled end"}
+        />
+        <YieldStat
+          icon="x-circle"
+          label="Cancelled"
+          value={`${cancelledCount}`}
+          sub="terminated early"
+        />
       </section>
 
+      {/* Table */}
       <section className="rounded-2xl glass overflow-hidden">
         <div className="hidden sm:grid grid-cols-12 gap-2 px-6 py-3 text-[10.5px] uppercase tracking-[0.16em] text-white/40 font-mono border-b border-white/5">
           <div className="col-span-1">Status</div>
-          <div className="col-span-3">Counterparty</div>
-          <div className="col-span-2 text-right">Final amount</div>
-          <div className="col-span-2">Duration</div>
-          <div className="col-span-2">Closed</div>
-          <div className="col-span-2 text-right">Solscan</div>
+          <div className="col-span-3">{hasLifecycleEvents ? "Stream" : "Counterparty"}</div>
+          <div className="col-span-2 text-right">{IS_STELLAR_MODE ? "Amount (XLM)" : "Final amount"}</div>
+          <div className="col-span-2">{IS_STELLAR_MODE ? "Event type" : "Duration"}</div>
+          <div className="col-span-2">{IS_STELLAR_MODE ? "Time" : "Closed"}</div>
+          <div className="col-span-2 text-right">{IS_STELLAR_MODE ? "Stellar Expert" : "Solscan"}</div>
         </div>
-        {visible.map((h) => (
-          <HistoryRow key={h.id} h={h} />
-        ))}
-        {visible.length === 0 && (
+
+        {/* Stellar empty states */}
+        {IS_STELLAR_MODE && !stellarLoading && walletConnected && visible.length === 0 && (
+          <div className="px-6 py-12 text-center space-y-2">
+            <div className="w-10 h-10 rounded-full mx-auto bg-white/5 flex items-center justify-center text-white/35">
+              <Icon name="inbox" size={16} />
+            </div>
+            {(stellarStreams?.count ?? 0) === 0 ? (
+              <>
+                <div className="text-[13px] text-white/55">No Stellar streams tracked yet.</div>
+                <div className="text-[11.5px] font-mono text-white/30">
+                  Create a new XLM stream or load an existing stream ID from the Streams page.
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-[13px] text-white/55">No history records found.</div>
+                <div className="text-[11.5px] font-mono text-white/30">
+                  Streams are tracked but no state could be loaded yet. Try refreshing.
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {IS_STELLAR_MODE
+          ? visible.map((h) => <StellarHistoryRow key={h.id} h={h} />)
+          : (visible as typeof HISTORY_DETAILED).map((h) => <HistoryRow key={h.id} h={h} />)
+        }
+
+        {!IS_STELLAR_MODE && visible.length === 0 && (
           <div className="px-6 py-12 text-center text-[13px] text-white/40 font-mono">No streams match this filter.</div>
         )}
       </section>
     </div>
+  );
+}
+
+function StellarHistoryRow({ h }: { h: StellarHistoryItem }) {
+  // Richer badge: map kind + eventType to a color/label
+  const badgeCfg = (() => {
+    if (h.kind === "cancelled") return { label: "Cancelled", cls: "border-amber-400/30 text-amber-300 bg-amber-400/5" };
+    if (h.kind === "ended")     return { label: "Completed", cls: "border-emerald-400/30 text-emerald-300 bg-emerald-400/5" };
+    if (h.eventType === "Active stream" || h.eventType === "Stream Created")
+                                return { label: "Active",    cls: "border-sky-400/30 text-sky-300 bg-sky-400/5" };
+    if (h.eventType === "Paused stream" || h.eventType === "Stream Paused")
+                                return { label: "Paused",    cls: "border-amber-400/30 text-amber-300 bg-amber-400/5" };
+    return { label: "Event", cls: "border-sky-400/30 text-sky-300 bg-sky-400/5" };
+  })();
+  const badge = (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-mono uppercase tracking-[0.12em] ${badgeCfg.cls}`}>
+      {badgeCfg.label}
+    </span>
+  );
+
+  // Explorer link: show tx hash if present, otherwise "Contract" label
+  const hasHash = !!h.txHash;
+  const shortLink = hasHash
+    ? h.txHash.slice(0, 6) + "…" + h.txHash.slice(-4)
+    : "Contract";
+
+  return (
+    <>
+      {/* Mobile card */}
+      <div className="sm:hidden px-4 py-3.5 border-b border-white/5 hover:bg-white/[0.02] space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="min-w-0">
+              <div className="text-[13px] text-white truncate font-mono">{h.eventType}</div>
+              <div className="text-[10px] font-mono text-white/35 truncate">{h.streamId}</div>
+            </div>
+          </div>
+          {badge}
+        </div>
+        <div className="flex items-center justify-between text-[12px]">
+          <div className="text-white/50 font-mono">{h.at !== "—" ? h.at : "—"}</div>
+          <div className="font-num text-white text-[13px]">
+            {h.finalXlm > 0 ? `${h.finalXlm.toFixed(4)} XLM` : "—"}
+          </div>
+        </div>
+        <div>
+          <a
+            href={h.explorerUrl !== "#" ? h.explorerUrl : undefined}
+            target={h.explorerUrl !== "#" ? "_blank" : undefined}
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 font-mono text-[11px] text-sky-300/70 hover:text-white"
+          >
+            {shortLink} <Icon name="arrow-up-right" size={10} />
+          </a>
+        </div>
+      </div>
+      {/* Desktop grid row */}
+      <div className="hidden sm:grid grid-cols-12 gap-2 px-6 py-4 text-[13px] border-b border-white/5 hover:bg-white/[0.02] items-center">
+        <div className="col-span-1">{badge}</div>
+        <div className="col-span-3 min-w-0">
+          <div className="text-white truncate font-mono text-[12px]">{h.counterparty}</div>
+          <div className="text-[10.5px] font-mono text-white/40">{h.streamId}</div>
+        </div>
+        <div className="col-span-2 text-right font-num text-white">
+          {h.finalXlm > 0 ? `${h.finalXlm.toFixed(4)} XLM` : "—"}
+        </div>
+        <div className="col-span-2 text-white/65 font-mono text-[12px]">{h.eventType}</div>
+        <div className="col-span-2 text-white/55 font-mono text-[12px]">{h.at}</div>
+        <div className="col-span-2 text-right">
+          <a
+            href={h.explorerUrl !== "#" ? h.explorerUrl : undefined}
+            target={h.explorerUrl !== "#" ? "_blank" : undefined}
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 font-mono text-[11.5px] text-sky-300/80 hover:text-white"
+          >
+            {shortLink} <Icon name="arrow-up-right" size={11} />
+          </a>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -1209,7 +1895,7 @@ function HistoryRow({ h }: any) {
         <div className="flex items-center justify-between text-[12px]">
           <div className="text-white/50 font-mono">{h.at} · {fmtDuration(h.duration)}</div>
           <div className="font-num text-white">
-            ${fmtUSD(h.final, 2)} <span className="text-white/40 text-[10.5px]">{h.token}</span>
+            ${fmtUSD(h.final, 2)}
           </div>
         </div>
         <div>
@@ -1228,7 +1914,7 @@ function HistoryRow({ h }: any) {
             <div className="text-[10.5px] font-mono text-white/40">{h.id}</div>
           </div>
         </div>
-        <div className="col-span-2 text-right font-num text-white">${fmtUSD(h.final, 2)} <span className="text-white/40 text-[11px]">{h.token}</span></div>
+        <div className="col-span-2 text-right font-num text-white">${fmtUSD(h.final, 2)}</div>
         <div className="col-span-2 text-white/65 font-mono text-[12px]">Streamed for {fmtDuration(h.duration)}</div>
         <div className="col-span-2 text-white/55 font-mono text-[12px]">{h.at}</div>
         <div className="col-span-2 text-right">
@@ -1358,8 +2044,8 @@ function AgentsPage({ streams = [], walletConnected = false, onNewStream, usingM
 
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <YieldStat icon="bot" label="Agents" value={`${AGENTS.length}`} sub={`${AGENTS.filter(a => a.status === "active").length} active`} />
-        <YieldStat icon="zap" label="Combined rate" value={`${totalRate.toFixed(7)}/s`} sub="SOL/s mesh" />
-        <YieldStat icon="layers" label="Session spend" value={`${fmtUSD(totalSpent, 4)} SOL`} sub="demo simulation" tone="up" />
+        <YieldStat icon="zap" label="Combined rate" value={`${totalRate.toFixed(7)}/s`} sub={`${IS_STELLAR_MODE ? "XLM" : "SOL"}/s mesh`} />
+        <YieldStat icon="layers" label="Session spend" value={`${fmtUSD(totalSpent, 4)} ${IS_STELLAR_MODE ? "XLM" : "SOL"}`} sub="demo simulation" tone="up" />
         <YieldStat icon="activity" label="Settlements" value={`${log.length * 24 + AGENT_LOG_DEMO.baseSettlements}`} sub="last hour" />
       </section>
 
@@ -1370,7 +2056,11 @@ function AgentsPage({ streams = [], walletConnected = false, onNewStream, usingM
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-[13px] text-white">Create or manage streams</div>
-          <div className="text-[11px] font-mono text-white/40">Solana Devnet and Stellar Testnet streams are managed from the Streams page.</div>
+          <div className="text-[11px] font-mono text-white/40">
+            {IS_STELLAR_MODE
+              ? "Stellar Testnet streams are managed from the Streams page."
+              : "Solana Devnet and Stellar Testnet streams are managed from the Streams page."}
+          </div>
         </div>
         <button
           onClick={onGoToStreams}
@@ -1424,15 +2114,15 @@ function AgentsPage({ streams = [], walletConnected = false, onNewStream, usingM
         <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="rounded-lg px-3 py-2.5 border border-white/8 bg-white/[0.03]">
             <div className="text-[10px] uppercase tracking-[0.14em] text-white/35 font-mono">Budget</div>
-            <div className="mt-1 text-[14px] font-mono text-white">{budgetSol.toFixed(4)} SOL</div>
+            <div className="mt-1 text-[14px] font-mono text-white">{budgetSol.toFixed(4)} {IS_STELLAR_MODE ? "XLM" : "SOL"}</div>
           </div>
           <div className="rounded-lg px-3 py-2.5 border border-violet-400/20 bg-violet-400/5">
             <div className="text-[10px] uppercase tracking-[0.14em] text-violet-300/60 font-mono">{isRealStream ? "Spent" : "Demo spend"}</div>
-            <div className="mt-1 text-[14px] font-mono text-iri">{liveSpent.toFixed(6)} SOL</div>
+            <div className="mt-1 text-[14px] font-mono text-iri">{liveSpent.toFixed(6)} {IS_STELLAR_MODE ? "XLM" : "SOL"}</div>
           </div>
           <div className="rounded-lg px-3 py-2.5 border border-white/8 bg-white/[0.03]">
             <div className="text-[10px] uppercase tracking-[0.14em] text-white/35 font-mono">Remaining</div>
-            <div className="mt-1 text-[14px] font-mono text-emerald-300">{(isRealStream ? Math.max(0, budgetSol - liveSpent) : remaining).toFixed(4)} SOL</div>
+            <div className="mt-1 text-[14px] font-mono text-emerald-300">{(isRealStream ? Math.max(0, budgetSol - liveSpent) : remaining).toFixed(4)} {IS_STELLAR_MODE ? "XLM" : "SOL"}</div>
           </div>
           <div className="rounded-lg px-3 py-2.5 border border-white/8 bg-white/[0.03]">
             <div className="text-[10px] uppercase tracking-[0.14em] text-white/35 font-mono">Rate</div>
@@ -1531,7 +2221,7 @@ function AgentsPage({ streams = [], walletConnected = false, onNewStream, usingM
                     <span className="text-white/35 shrink-0">{l.time}</span>
                     <span className="text-violet-300 shrink-0">{l.agent}</span>
                     <span className="text-white/40 shrink-0">{l.verb}</span>
-                    <span className="text-emerald-300 shrink-0">+{l.amt} SOL</span>
+                    <span className="text-emerald-300 shrink-0">+{l.amt} {IS_STELLAR_MODE ? "XLM" : "SOL"}</span>
                     <span className="text-white/30 shrink-0">→</span>
                     <span className="text-cyan-300 truncate min-w-0">{l.target}</span>
                     <span className="ml-auto text-white/30 shrink-0">{l.tokens}</span>
@@ -1549,7 +2239,11 @@ function AgentsPage({ streams = [], walletConnected = false, onNewStream, usingM
 // =========================================================================
 // SETTINGS page (lightweight)
 // =========================================================================
-function SettingsPage() {
+function SettingsPage({ freighter }: any) {
+  const stellarAddr = freighter?.connected && freighter.address
+    ? `${freighter.address.slice(0, 4)}...${freighter.address.slice(-6)}`
+    : null;
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -1562,22 +2256,41 @@ function SettingsPage() {
           <div className="text-[11px] uppercase tracking-[0.2em] text-violet-300/70 font-mono">Identity</div>
           <div className="mt-4 flex items-center gap-3">
             <span className="w-12 h-12 rounded-full bg-gradient-to-br from-violet-400 to-fuchsia-500" />
-            <div>
-              <div className="text-[15px] text-white">{USER_WALLET_PROFILE.name}</div>
-              <div className="text-[11.5px] font-mono text-white/45">{USER_WALLET_PROFILE.embeddedWalletLabel}</div>
-            </div>
+            {IS_STELLAR_MODE ? (
+              <div>
+                <div className="text-[15px] text-white">{stellarAddr ?? "Drip Stellar Wallet"}</div>
+                <div className="text-[11.5px] font-mono text-white/45">
+                  {freighter?.connected ? `Freighter · ${stellarAddr}` : "Freighter wallet · Not connected"}
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="text-[15px] text-white">{USER_WALLET_PROFILE.name}</div>
+                <div className="text-[11.5px] font-mono text-white/45">{USER_WALLET_PROFILE.embeddedWalletLabel}</div>
+              </div>
+            )}
           </div>
           <div className="mt-5 space-y-2">
-            <SettingRow label="Email" value={USER_WALLET_PROFILE.email} />
-            <SettingRow label="Recovery" value={USER_WALLET_PROFILE.recovery} />
-            <SettingRow label="2FA" value={USER_WALLET_PROFILE.twoFactor} tone="up" />
+            {IS_STELLAR_MODE ? (
+              <>
+                <SettingRow label="Wallet" value="Freighter" />
+                <SettingRow label="Network" value={freighter?.network ?? "Stellar Testnet"} />
+                <SettingRow label="Status" value={freighter?.connected ? "Connected" : "Not connected"} tone={freighter?.connected ? "up" : undefined} />
+              </>
+            ) : (
+              <>
+                <SettingRow label="Email" value={USER_WALLET_PROFILE.email} />
+                <SettingRow label="Recovery" value={USER_WALLET_PROFILE.recovery} />
+                <SettingRow label="2FA" value={USER_WALLET_PROFILE.twoFactor} tone="up" />
+              </>
+            )}
           </div>
         </div>
 
         <div className="rounded-2xl glass p-6">
           <div className="text-[11px] uppercase tracking-[0.2em] text-violet-300/70 font-mono">Defaults</div>
           <div className="mt-4 space-y-3">
-            {SETTINGS_DEFAULTS.map((setting) => (
+            {(IS_STELLAR_MODE ? STELLAR_SETTINGS_DEFAULTS : SETTINGS_DEFAULTS).map((setting) => (
               <SettingRow key={setting.label} {...setting} />
             ))}
           </div>
@@ -1659,25 +2372,27 @@ function NewStreamDrawer({ open, onClose, onCreate, walletConnected, onConnectWa
           </div>
 
           <div className="flex-1 overflow-auto px-7 py-6 space-y-6">
-            <Field label="Recipient" hint="Wallet address or .sol name">
+            <Field label="Recipient" hint={IS_STELLAR_MODE ? "Stellar address (G...)" : "Wallet address or .sol name"}>
               <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/8 focus-within:border-violet-400/40 transition">
                 <Icon name="at-sign" size={14} className="text-white/45" />
                 <input
                   value={recipient}
                   onChange={(e) => setRecipient(e.target.value)}
-                  placeholder={NEW_STREAM_DEFAULTS.recipientPlaceholder}
+                  placeholder={IS_STELLAR_MODE ? "G4AH...VKLBWQ" : NEW_STREAM_DEFAULTS.recipientPlaceholder}
                   className="flex-1 bg-transparent outline-none text-[14px] font-mono text-white placeholder-white/25"
                 />
                 {recipientOk && <Icon name="check-circle-2" size={14} className="text-emerald-300" />}
               </div>
-              <div className="mt-2 flex items-center gap-1.5 flex-wrap">
-                {NEW_STREAM_DEFAULTS.quickRecipients.map((s) => (
-                  <button key={s} onClick={() => setRecipient(s)} className="text-[11px] font-mono px-2 py-0.5 rounded-full border border-white/10 text-white/55 hover:text-white hover:border-violet-400/30">
-                    {s}
-                  </button>
-                ))}
-              </div>
-              {recipientOk && SOLANA_CLUSTER !== "mainnet-beta" && (
+              {!IS_STELLAR_MODE && (
+                <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                  {NEW_STREAM_DEFAULTS.quickRecipients.map((s) => (
+                    <button key={s} onClick={() => setRecipient(s)} className="text-[11px] font-mono px-2 py-0.5 rounded-full border border-white/10 text-white/55 hover:text-white hover:border-violet-400/30">
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {recipientOk && !IS_STELLAR_MODE && SOLANA_CLUSTER !== "mainnet-beta" && (
                 <div className="mt-1.5 text-[11px] font-mono text-amber-200/70 flex items-center gap-1">
                   <Icon name="triangle-alert" size={11} /> Receiver should have devnet SOL to avoid rent issues. Airdrop at faucet.solana.com if needed.
                 </div>
@@ -1704,7 +2419,7 @@ function NewStreamDrawer({ open, onClose, onCreate, walletConnected, onConnectWa
               {policy === "agent" && (
                 <div className="mt-3 rounded-xl border border-violet-400/25 bg-violet-400/[0.06] p-3.5 space-y-3">
                   <div>
-                    <div className="text-[10.5px] uppercase tracking-[0.18em] text-violet-200/80 font-mono mb-1.5">Max Budget Cap (SOL)</div>
+                    <div className="text-[10.5px] uppercase tracking-[0.18em] text-violet-200/80 font-mono mb-1.5">Max Budget Cap ({IS_STELLAR_MODE ? "XLM" : "SOL"})</div>
                     <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/30 border border-white/8">
                       <span className="text-white/40 font-num">◎</span>
                       <input type="number" min={0} step={0.01} value={budgetCap} onChange={(e) => setBudgetCap(Math.max(0, Number(e.target.value) || 0))} className="flex-1 bg-transparent outline-none font-num text-white num-stable" />
@@ -1727,7 +2442,7 @@ function NewStreamDrawer({ open, onClose, onCreate, walletConnected, onConnectWa
                     <span className="text-[13px] text-white">{t.k}</span>
                   </button>
                 ))}
-                <span className="ml-auto text-[11px] font-mono text-white/40">Native SOL only</span>
+                <span className="ml-auto text-[11px] font-mono text-white/40">Native {IS_STELLAR_MODE ? "XLM" : "SOL"} only</span>
               </div>
             </Field>
 
@@ -1794,15 +2509,19 @@ function NewStreamDrawer({ open, onClose, onCreate, walletConnected, onConnectWa
                 <BreakdownCell label="/day"  value={perDay.toFixed(2)} />
               </div>
               <div className="mt-3 text-[11.5px] font-mono text-white/45">
-                Settles every <span className="text-violet-200">{PROTOCOL_STATS.blockTime}</span> on Solana · receiver can withdraw mid-stream
+                {IS_STELLAR_MODE
+                  ? <>Settles on Stellar Testnet via Soroban · receiver can withdraw mid-stream</>
+                  : <>Settles every <span className="text-violet-200">{PROTOCOL_STATS.blockTime}</span> on Solana · receiver can withdraw mid-stream</>}
               </div>
-              <div className={`mt-2 text-[11px] font-mono ${flowRateTooSmall ? "text-rose-300" : "text-white/35"}`}>
-                = {flowRateLamports.toLocaleString()} lamports/sec
-                {flowRateTooSmall && <span className="ml-2 font-bold">— rounds to 0, increase amount or shorten period</span>}
-              </div>
+              {!IS_STELLAR_MODE && (
+                <div className={`mt-2 text-[11px] font-mono ${flowRateTooSmall ? "text-rose-300" : "text-white/35"}`}>
+                  = {flowRateLamports.toLocaleString()} lamports/sec
+                  {flowRateTooSmall && <span className="ml-2 font-bold">— rounds to 0, increase amount or shorten period</span>}
+                </div>
+              )}
             </div>
 
-            <Field label="Initial deposit (SOL)" hint="How much SOL to lock in escrow">
+            <Field label={`Initial deposit (${IS_STELLAR_MODE ? "XLM" : "SOL"})`} hint={`How much ${IS_STELLAR_MODE ? "XLM" : "SOL"} to lock in escrow`}>
               <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/8 focus-within:border-violet-400/40 transition">
                 <span className="text-white/40 text-[18px] font-num">◎</span>
                 <input
@@ -1838,7 +2557,7 @@ function NewStreamDrawer({ open, onClose, onCreate, walletConnected, onConnectWa
                 className="w-full px-3 py-2.5 rounded-xl bg-[#0b0a1a] border border-white/8 focus:border-violet-400/40 outline-none text-[13.5px] text-white"
                 style={{ colorScheme: "dark" }}
               >
-                <option value="AI_COMPUTE">AI Compute</option>
+                {!IS_STELLAR_MODE && <option value="AI_COMPUTE">AI Compute</option>}
                 <option value="API_COSTS">API Costs</option>
                 <option value="HUMAN_PAYROLL">Human Payroll</option>
                 <option value="B2B_SUBSCRIPTION">B2B Subscription</option>
@@ -1869,16 +2588,18 @@ function NewStreamDrawer({ open, onClose, onCreate, walletConnected, onConnectWa
               </Field>
             )}
 
-            <div className="rounded-xl border border-white/8 bg-white/[0.02] p-4 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400/20 to-violet-400/20 flex items-center justify-center text-emerald-300">
-                <Icon name="sprout" size={16} />
+            {!IS_STELLAR_MODE && (
+              <div className="rounded-xl border border-white/8 bg-white/[0.02] p-4 flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400/20 to-violet-400/20 flex items-center justify-center text-emerald-300">
+                  <Icon name="sprout" size={16} />
+                </div>
+                <div className="flex-1">
+                  <div className="text-[13.5px] text-white">Route idle escrow to Raydium</div>
+                  <div className="text-[11.5px] font-mono text-white/40 mt-0.5">+{PROTOCOL_STATS.yieldApy.toFixed(2)}% APY · withdrawn alongside stream</div>
+                </div>
+                <Toggle defaultOn />
               </div>
-              <div className="flex-1">
-                <div className="text-[13.5px] text-white">Route idle escrow to Raydium</div>
-                <div className="text-[11.5px] font-mono text-white/40 mt-0.5">+{PROTOCOL_STATS.yieldApy.toFixed(2)}% APY · withdrawn alongside stream</div>
-              </div>
-              <Toggle defaultOn />
-            </div>
+            )}
           </div>
 
           <div className="px-7 py-5 border-t border-white/5 space-y-3">
@@ -1926,19 +2647,27 @@ function NewStreamDrawer({ open, onClose, onCreate, walletConnected, onConnectWa
               </button>
             </div>
             <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-white/[0.04]">
-              {!DRIP_PROGRAM_ID_CONFIGURED && (
-                <span className="flex items-center gap-1 text-[10px] font-mono text-amber-300/80">
-                  <Icon name="triangle-alert" size={10} /> program ID not set
-                </span>
-              )}
-              {DRIP_PROGRAM_ID_CONFIGURED && (
+              {IS_STELLAR_MODE ? (
                 <span className="text-[10px] font-mono text-white/25">
-                  {SOLANA_CLUSTER}
-                  <span className="text-white/15 mx-1">·</span>
-                  {DRIP_PROGRAM_ID.toBase58().slice(0, 6)}...{DRIP_PROGRAM_ID.toBase58().slice(-4)}
-                  <span className="text-white/15 mx-1">·</span>
-                  {(() => { try { return new URL(SOLANA_RPC_URL).hostname; } catch { return SOLANA_RPC_URL; } })()}
+                  Stellar Testnet · Soroban · Freighter required
                 </span>
+              ) : (
+                <>
+                  {!DRIP_PROGRAM_ID_CONFIGURED && (
+                    <span className="flex items-center gap-1 text-[10px] font-mono text-amber-300/80">
+                      <Icon name="triangle-alert" size={10} /> program ID not set
+                    </span>
+                  )}
+                  {DRIP_PROGRAM_ID_CONFIGURED && (
+                    <span className="text-[10px] font-mono text-white/25">
+                      {SOLANA_CLUSTER}
+                      <span className="text-white/15 mx-1">·</span>
+                      {DRIP_PROGRAM_ID.toBase58().slice(0, 6)}...{DRIP_PROGRAM_ID.toBase58().slice(-4)}
+                      <span className="text-white/15 mx-1">·</span>
+                      {(() => { try { return new URL(SOLANA_RPC_URL).hostname; } catch { return SOLANA_RPC_URL; } })()}
+                    </span>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -2000,9 +2729,14 @@ export default function DashboardApp() {
   const [streamActions, setStreamActions] = useState<Record<string, { pending: string | null; txSig: string | null; error: string | null }>>({});
   const inFlightRef = useRef<Set<string>>(new Set());
   const [cancelConfirm, setCancelConfirm] = useState<any | null>(null);
-  const [streamChain, setStreamChain] = useState<"solana-devnet" | "stellar-testnet">("solana-devnet");
+  const [streamChain, setStreamChain] = useState<"solana-devnet" | "stellar-testnet">(IS_STELLAR_MODE ? "stellar-testnet" : "solana-devnet");
   const freighter = useFreighterWallet();
-  const { connected, connect, wallet, publicKey, error: walletError } = useDripWallet();
+  const stellarStreams = useStellarStreams(IS_STELLAR_MODE ? freighter.address : null);
+  const solanaWalletState = useDripWallet();
+  // In Stellar mode we never use the Solana wallet — stub out to safe defaults.
+  const { connected, connect, wallet, publicKey, error: walletError } = IS_STELLAR_MODE
+    ? { connected: false, connect: null, wallet: null, publicKey: null, error: null }
+    : solanaWalletState;
 
   useEffect(() => {
     if (connected) setWalletPrompt(null);
@@ -2010,6 +2744,7 @@ export default function DashboardApp() {
 
   const requireWallet = useCallback(
     (message = "Connect a wallet before signing this transaction.") => {
+      if (IS_STELLAR_MODE) return false;
       if (connected) return true;
       setWalletPrompt(message);
       void connect?.();
@@ -2025,8 +2760,8 @@ export default function DashboardApp() {
   const [drawerPrefill, setDrawerPrefill] = useState<any>(null);
 
   const openNewStream = useCallback(() => {
-    // If Stellar tab is active, navigate to Streams/Stellar — no Solana drawer
-    if (streamChain === "stellar-testnet") {
+    // In Stellar mode (or when Stellar tab is active) navigate to Streams/Stellar panel
+    if (IS_STELLAR_MODE || streamChain === "stellar-testnet") {
       setRoute("streams");
       return;
     }
@@ -2056,6 +2791,8 @@ export default function DashboardApp() {
   }, [requireWallet]);
 
   const handleRouteChange = (nextRoute) => {
+    if (IS_STELLAR_MODE && nextRoute === "yield") { setRoute("dashboard"); return; }
+    if (IS_STELLAR_MODE && nextRoute === "agents") { setRoute("streams"); return; }
     setRoute(nextRoute);
   };
 
@@ -2268,11 +3005,11 @@ export default function DashboardApp() {
   return (
     <div className="min-h-screen relative flex">
       <Backdrop />
-      <Sidebar active={route} onChange={handleRouteChange} streams={streams} />
+      <Sidebar active={route} onChange={handleRouteChange} streams={streams} stellarStreamCount={IS_STELLAR_MODE ? stellarStreams.count : undefined} />
       <div className="flex-1 min-w-0">
         <Topbar route={route} onNewStream={openNewStream} streamChain={streamChain} freighter={freighter} />
         <MobileBottomNav active={route} onChange={handleRouteChange} />
-        <main className="px-4 py-5 sm:px-8 sm:py-7 max-w-[1480px] pb-24 lg:pb-10">
+        <main className="px-4 py-5 sm:px-8 sm:py-7 w-full pb-24 lg:pb-10">
           {walletPrompt && !connected && (
             <div className="mb-4 rounded-xl border border-amber-400/25 bg-amber-400/[0.06] px-4 py-3 text-[12.5px] text-amber-100/90 flex items-center gap-2">
               <Icon name="triangle-alert" size={14} className="text-amber-200" />
@@ -2293,16 +3030,17 @@ export default function DashboardApp() {
             </div>
           )}
           <RouteTransition k={route}>
-            {route === "dashboard" && <DashboardPage streams={streams} onNewStream={openNewStream} onGoTo={setRoute} walletConnected={connected} walletError={walletError} onConnectWallet={connectWallet} onRequireWallet={requireWallet} />}
-            {route === "streams"   && <StreamsPage   streams={streams} setStreams={setStreams} onNewStream={openNewStream} walletConnected={connected} onRequireWallet={requireWallet} streamsLoading={streamsLoading} streamsError={streamsError} onRefresh={refreshStreams} onWithdraw={handleWithdraw} onPause={handlePause} onResume={handleResume} onCancelStream={handleCancelStream} streamActions={streamActions} streamChain={streamChain} onChainChange={setStreamChain} freighter={freighter} />}
-            {route === "yield"     && <YieldPage     streams={streams} walletConnected={connected} onRequireWallet={requireWallet} />}
-            {route === "history"   && <HistoryPage />}
-            {route === "agents"    && <AgentsPage streams={streams} walletConnected={connected} onNewStream={openAgentStream} usingMockData={usingMockData} onGoToStreams={() => setRoute("streams")} />}
-            {route === "reports"   && <CompliancePage />}
-            {route === "settings"  && <SettingsPage />}
+            {route === "dashboard" && <DashboardPage streams={streams} onNewStream={openNewStream} onGoTo={setRoute} walletConnected={IS_STELLAR_MODE ? freighter.connected : connected} walletError={walletError} onConnectWallet={IS_STELLAR_MODE ? (freighter.connect ?? connectWallet) : connectWallet} onRequireWallet={requireWallet} stellarStreams={IS_STELLAR_MODE ? stellarStreams : undefined} />}
+            {route === "streams"   && <StreamsPage   streams={streams} setStreams={setStreams} onNewStream={openNewStream} walletConnected={connected} onRequireWallet={requireWallet} streamsLoading={streamsLoading} streamsError={streamsError} onRefresh={refreshStreams} onWithdraw={handleWithdraw} onPause={handlePause} onResume={handleResume} onCancelStream={handleCancelStream} streamActions={streamActions} streamChain={streamChain} onChainChange={setStreamChain} freighter={freighter} stellarStreams={IS_STELLAR_MODE ? stellarStreams : undefined} />}
+            {route === "yield" && !IS_STELLAR_MODE && <YieldPage streams={streams} walletConnected={connected} onRequireWallet={requireWallet} />}
+            {route === "history"   && <HistoryPage freighter={IS_STELLAR_MODE ? freighter : undefined} stellarStreams={IS_STELLAR_MODE ? stellarStreams : undefined} />}
+            {route === "agents" && !IS_STELLAR_MODE && <AgentsPage streams={streams} walletConnected={connected} onNewStream={openAgentStream} usingMockData={usingMockData} onGoToStreams={() => setRoute("streams")} />}
+            {IS_STELLAR_MODE && (route === "yield" || route === "agents") && <StreamsPage streams={streams} setStreams={setStreams} onNewStream={openNewStream} walletConnected={connected} onRequireWallet={requireWallet} streamsLoading={streamsLoading} streamsError={streamsError} onRefresh={refreshStreams} onWithdraw={handleWithdraw} onPause={handlePause} onResume={handleResume} onCancelStream={handleCancelStream} streamActions={streamActions} streamChain={streamChain} onChainChange={setStreamChain} freighter={freighter} stellarStreams={stellarStreams} />}
+            {route === "reports"   && <CompliancePage stellarAddress={IS_STELLAR_MODE ? freighter.address : null} stellarStreams={IS_STELLAR_MODE ? stellarStreams : undefined} />}
+            {route === "settings"  && <SettingsPage freighter={freighter} />}
           </RouteTransition>
           <div className="text-center text-[11px] font-mono text-white/30 pt-12 pb-12">
-            Drip · {PROTOCOL_STATS.clusterLabel} · {PROTOCOL_STATS.version} · made with love for the streaming economy
+            Drip · {IS_STELLAR_MODE ? "Stellar Testnet" : PROTOCOL_STATS.clusterLabel} · {PROTOCOL_STATS.version} · made with love for the streaming economy
           </div>
         </main>
       </div>

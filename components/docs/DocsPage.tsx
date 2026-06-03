@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { DOCS_NAV, DOCS_PAGES, type DocPage, type DocSection } from "@/lib/docs-content";
+import { DOCS_NAV, DOCS_PAGES, STELLAR_BLOCKED_SLUGS, type DocPage, type DocSection } from "@/lib/docs-content";
 import { Icon } from "@/components/ui/Icon";
 import { DocsBackground } from "@/components/ui/backgrounds";
+import { IS_STELLAR_MODE } from "@/lib/app-config";
 
 function TopBar() {
   return (
@@ -31,9 +32,12 @@ function TopBar() {
 }
 
 function DocsNav({ activeSlug }: { activeSlug: string }) {
+  const navItems = IS_STELLAR_MODE
+    ? DOCS_NAV.filter((item) => !STELLAR_BLOCKED_SLUGS.includes(item.slug))
+    : DOCS_NAV;
   return (
     <nav className="space-y-1" aria-label="Documentation">
-      {DOCS_NAV.map((item) => {
+      {navItems.map((item) => {
         const isActive = item.slug === activeSlug;
         return (
           <Link
@@ -316,15 +320,27 @@ export default function DocsPage({ page }: { page: DocPage }) {
             Docs
           </div>
           <DocsNav activeSlug={page.slug} />
-          <div className="mt-8 rounded-xl border border-white/10 bg-white/[0.025] p-4">
-            <div className="flex items-center gap-2 text-[12px] font-medium text-white">
-              <Icon name="lock" size={14} className="text-violet-200" />
-              Private alpha
+          {IS_STELLAR_MODE ? (
+            <div className="mt-8 rounded-xl border border-cyan-400/20 bg-cyan-400/[0.05] p-4">
+              <div className="flex items-center gap-2 text-[12px] font-medium text-white">
+                <Icon name="shield-check" size={14} className="text-cyan-300" />
+                Stellar Testnet
+              </div>
+              <p className="mt-2 text-[12.5px] leading-5 text-white/55">
+                Create, pause, resume, withdraw, and cancel native XLM streams. Testnet only, no real funds.
+              </p>
             </div>
-            <p className="mt-2 text-[12.5px] leading-5 text-white/55">
-              DRIP is preparing for controlled mainnet alpha access with approved wallets.
-            </p>
-          </div>
+          ) : (
+            <div className="mt-8 rounded-xl border border-white/10 bg-white/[0.025] p-4">
+              <div className="flex items-center gap-2 text-[12px] font-medium text-white">
+                <Icon name="lock" size={14} className="text-violet-200" />
+                Private alpha
+              </div>
+              <p className="mt-2 text-[12.5px] leading-5 text-white/55">
+                DRIP is preparing for controlled mainnet alpha access with approved wallets.
+              </p>
+            </div>
+          )}
         </aside>
 
         <main className="min-w-0 flex-1 px-4 py-9 pb-24 sm:px-8 lg:px-12">

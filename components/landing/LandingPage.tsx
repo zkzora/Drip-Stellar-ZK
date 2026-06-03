@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { GlowCard } from "@/components/ui/spotlight-card";
@@ -22,9 +22,22 @@ import {
   LANDING_STREAMING_CARD,
   LANDING_USE_CASES,
   PROTOCOL_STATS,
+  STELLAR_DEV_CODE_SAMPLE,
+  STELLAR_DEV_FEATURES,
+  STELLAR_DRIP_COMPARE_PANELS,
+  STELLAR_DRIP_PILLARS,
+  STELLAR_ECOSYSTEM_PARTNERS,
+  STELLAR_FINAL_CTA_STATS,
+  STELLAR_LANDING_AGENT_DEMO,
+  STELLAR_LANDING_PARTNERS,
+  STELLAR_LANDING_PROTOCOL_STATS,
+  STELLAR_LANDING_STREAMING_CARD,
+  STELLAR_PROTOCOL_STATS,
+  STELLAR_WORKFORCE_DEMO,
   SUBSCRIPTION_DEMO,
   WORKFORCE_DEMO,
 } from "@/lib/mock-data";
+import { IS_STELLAR_MODE } from "@/lib/app-config";
 
 // Drip  -  Streaming payments on Solana
 // Single-file React app rendered into #root.
@@ -79,14 +92,14 @@ function useInView(threshold = 0.15) {
 
 // ── Particles (8 only, no boxShadow, GPU-composited) ──────────────────────
 const PARTICLES = [
-  { l:"7%",  t:"11%", s:1.5, d:"7s",  e:"0s",   c:"#A07FF8" },
-  { l:"37%", t:"6%",  s:2,   d:"8s",  e:"0.5s", c:"#22D3EE" },
-  { l:"68%", t:"33%", s:1,   d:"9s",  e:"0.8s", c:"#22D3EE" },
-  { l:"83%", t:"13%", s:2,   d:"14s", e:"1.8s", c:"#A07FF8" },
-  { l:"29%", t:"74%", s:1,   d:"7s",  e:"2.5s", c:"#22D3EE" },
-  { l:"63%", t:"69%", s:1,   d:"13s", e:"4.0s", c:"#A07FF8" },
-  { l:"90%", t:"44%", s:1,   d:"15s", e:"5.0s", c:"#A07FF8" },
-  { l:"17%", t:"43%", s:1,   d:"8s",  e:"0.2s", c:"#22D3EE" },
+  { l: "7%", t: "11%", s: 1.5, d: "7s", e: "0s", c: "#A07FF8" },
+  { l: "37%", t: "6%", s: 2, d: "8s", e: "0.5s", c: "#22D3EE" },
+  { l: "68%", t: "33%", s: 1, d: "9s", e: "0.8s", c: "#22D3EE" },
+  { l: "83%", t: "13%", s: 2, d: "14s", e: "1.8s", c: "#A07FF8" },
+  { l: "29%", t: "74%", s: 1, d: "7s", e: "2.5s", c: "#22D3EE" },
+  { l: "63%", t: "69%", s: 1, d: "13s", e: "4.0s", c: "#A07FF8" },
+  { l: "90%", t: "44%", s: 1, d: "15s", e: "5.0s", c: "#A07FF8" },
+  { l: "17%", t: "43%", s: 1, d: "8s", e: "0.2s", c: "#22D3EE" },
 ];
 
 function BackdropParticles() {
@@ -113,8 +126,8 @@ function BackdropStreaks() {
   return (
     <>
       {[
-        { top: "19%", w: "190px", h: "1.5px", col: "rgba(160,127,248,0.7)", dur: "10s", del: "0s"  },
-        { top: "71%", w: "95px",  h: "0.8px", col: "rgba(182,154,255,0.4)", dur: "23s", del: "9s"  },
+        { top: "19%", w: "190px", h: "1.5px", col: "rgba(160,127,248,0.7)", dur: "10s", del: "0s" },
+        { top: "71%", w: "95px", h: "0.8px", col: "rgba(182,154,255,0.4)", dur: "23s", del: "9s" },
       ].map((s, i) => (
         <div
           key={i}
@@ -143,15 +156,15 @@ function BackdropStreamLines() {
     >
       <defs>
         <linearGradient id="sgA" x1="0%" x2="100%">
-          <stop offset="0%"   stopColor="#8144EE" stopOpacity="0" />
-          <stop offset="30%"  stopColor="#A07FF8" stopOpacity="0.32" />
-          <stop offset="70%"  stopColor="#B69AFF" stopOpacity="0.24" />
+          <stop offset="0%" stopColor="#8144EE" stopOpacity="0" />
+          <stop offset="30%" stopColor="#A07FF8" stopOpacity="0.32" />
+          <stop offset="70%" stopColor="#B69AFF" stopOpacity="0.24" />
           <stop offset="100%" stopColor="#22D3EE" stopOpacity="0" />
         </linearGradient>
         <linearGradient id="sgB" x1="0%" x2="100%">
-          <stop offset="0%"   stopColor="#22D3EE" stopOpacity="0" />
-          <stop offset="45%"  stopColor="#22D3EE" stopOpacity="0.18" />
-          <stop offset="90%"  stopColor="#A07FF8" stopOpacity="0.14" />
+          <stop offset="0%" stopColor="#22D3EE" stopOpacity="0" />
+          <stop offset="45%" stopColor="#22D3EE" stopOpacity="0.18" />
+          <stop offset="90%" stopColor="#A07FF8" stopOpacity="0.14" />
           <stop offset="100%" stopColor="#8144EE" stopOpacity="0" />
         </linearGradient>
         <filter id="sfg">
@@ -260,7 +273,9 @@ function Nav() {
           <a href="#" className="flex items-center gap-2.5 group">
             <DripMark />
             <span className="font-medium tracking-tight text-[17px]">Drip</span>
-            <span className="hidden sm:inline font-mono text-[10px] uppercase tracking-[0.18em] text-violet-300/70 ml-1 px-1.5 py-0.5 rounded border border-violet-400/20">{PROTOCOL_STATS.version} · devnet</span>
+            <span className="hidden sm:inline font-mono text-[10px] uppercase tracking-[0.18em] text-violet-300/70 ml-1 px-1.5 py-0.5 rounded border border-violet-400/20">
+              {PROTOCOL_STATS.version} · {IS_STELLAR_MODE ? "testnet" : "devnet"}
+            </span>
           </a>
           <nav className="hidden md:flex items-center gap-1">
             {NAV_LINKS.map((link) => (
@@ -325,29 +340,38 @@ function Hero() {
               <span className="absolute inline-flex h-full w-full rounded-full bg-violet-300 opacity-75 animate-ping" />
               <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-violet-300" />
             </span>
-            <span className="font-mono uppercase tracking-[0.16em]">Now live on Solana devnet</span>
-            <span className="text-white/30">·</span>
-            <span>2026 cohort</span>
+            <span className="font-mono uppercase tracking-[0.16em]">
+              {IS_STELLAR_MODE ? "Now live on Stellar Testnet" : "Now live on Solana devnet"}
+            </span>
+
           </div>
 
           {/* Headline */}
           <h1 className="anim-fade-up delay-80 text-[38px] sm:text-[52px] lg:text-[68px] leading-[1.02] font-medium tracking-[-0.025em] text-iri-anim">
-            Programmable Cashflow<br />for AI Agents.
+            {IS_STELLAR_MODE ? (
+              <>Programmable XLM<br />Payment Streams.</>
+            ) : (
+              <>Programmable Cashflow<br />for AI Agents.</>
+            )}
           </h1>
 
           {/* Subtitle */}
           <p className="anim-fade-up delay-160 mt-6 text-[15px] sm:text-[18.5px] text-white/65 leading-[1.55] max-w-[580px]">
-            Drip is the first streaming payment protocol built for the autonomous agent economy. Set spending policies, stream funds per-second, and automate compliance on Solana.
+            {IS_STELLAR_MODE
+              ? "Create, pause, resume, withdraw, and cancel XLM streams on Stellar Testnet using Soroban and Freighter. Trustless, per-second, no bridge required."
+              : "Drip is the first streaming payment protocol built for the autonomous agent economy. Set spending policies, stream funds per-second, and automate compliance on Solana."}
           </p>
 
           {/* CTAs */}
           <div className="anim-fade-up delay-240 mt-9 flex flex-wrap items-center gap-3">
             <a href="/dashboard" className="btn-primary rounded-full px-5 py-3 text-[14px] font-medium text-white flex items-center gap-2">
-              <Icon name="zap" size={15} /> Launch App
+              <Icon name="zap" size={15} /> {IS_STELLAR_MODE ? "Launch Stellar Testnet App" : "Launch App"}
             </a>
-            <button className="btn-ghost rounded-full px-5 py-3 text-[14px] text-white/90 flex items-center gap-2">
-              <Icon name="terminal" size={15} /> Build on Drip
-            </button>
+            {!IS_STELLAR_MODE && (
+              <button className="btn-ghost rounded-full px-5 py-3 text-[14px] text-white/90 flex items-center gap-2">
+                <Icon name="terminal" size={15} /> Build on Drip
+              </button>
+            )}
             <a href="#why-drip" className="text-[13.5px] text-white/55 hover:text-white px-2 py-2 flex items-center gap-1.5">
               Learn more <Icon name="arrow-right" size={13} />
             </a>
@@ -355,7 +379,7 @@ function Hero() {
 
           {/* Stats strip */}
           <div className="anim-fade-up delay-320 mt-10 grid grid-cols-3 gap-4 sm:gap-6 max-w-[520px]">
-            {LANDING_PROTOCOL_STATS.map((stat, i) => (
+            {(IS_STELLAR_MODE ? STELLAR_LANDING_PROTOCOL_STATS : LANDING_PROTOCOL_STATS).map((stat) => (
               <Stat key={stat.label} label={stat.label} value={stat.value} hint={stat.hint} />
             ))}
           </div>
@@ -385,16 +409,17 @@ function Stat({ label, value, hint }: any) {
 // =========================================================================
 function StreamingCard() {
   const [running, setRunning] = useState(true);
-  const RATE = LANDING_STREAMING_CARD.rate;
-  const value = useStreamingValue(LANDING_STREAMING_CARD.initialValue, RATE, running);
+  const CARD = IS_STELLAR_MODE ? STELLAR_LANDING_STREAMING_CARD : LANDING_STREAMING_CARD;
+  const RATE = CARD.rate;
+  const value = useStreamingValue(CARD.initialValue, RATE, running);
 
-  const startedAt = useMemo(() => Date.now() - LANDING_STREAMING_CARD.startedOffsetMs, []);
-  const elapsedSec = Math.floor((Date.now() - startedAt) / 1000) + Math.floor((value - LANDING_STREAMING_CARD.initialValue) / RATE);
+  const startedAt = useMemo(() => Date.now() - CARD.startedOffsetMs, []);
+  const elapsedSec = Math.floor((Date.now() - startedAt) / 1000) + Math.floor((value - CARD.initialValue) / RATE);
   const fmtElapsed = (s) => {
     const d = Math.floor(s / 86400);
     const h = Math.floor((s % 86400) / 3600);
     const m = Math.floor((s % 3600) / 60);
-    return `${d}d ${String(h).padStart(2,"0")}h ${String(m).padStart(2,"0")}m`;
+    return `${d}d ${String(h).padStart(2, "0")}h ${String(m).padStart(2, "0")}m`;
   };
 
   const valStr = fmtUSD(value, 6);
@@ -413,7 +438,7 @@ function StreamingCard() {
         <div className="flex items-start justify-between relative">
           <div>
             <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.18em] text-white/45">
-              <Icon name="waves" size={13} /> Active stream · {LANDING_STREAMING_CARD.activeStreamId}
+              <Icon name="waves" size={13} /> Active stream · {CARD.activeStreamId}
             </div>
             <div className="mt-2 flex items-center gap-2">
               <span className="pulse-dot inline-block w-2 h-2 rounded-full bg-emerald-400" />
@@ -433,9 +458,9 @@ function StreamingCard() {
 
         {/* Counter */}
         <div className="mt-7">
-          <div className="text-[10.5px] uppercase tracking-[0.2em] text-white/40 font-mono">Received · {LANDING_STREAMING_CARD.token}</div>
+          <div className="text-[10.5px] uppercase tracking-[0.2em] text-white/40 font-mono">Received · {CARD.token}</div>
           <div className="mt-3 flex items-baseline gap-1 num-stable">
-            <span className="text-white/40 text-[34px] font-num">◎</span>
+            <span className="text-white/40 text-[34px] font-num">{IS_STELLAR_MODE ? "✦" : "◎"}</span>
             <span className="text-iri text-[58px] font-num leading-none tracking-[-0.02em]">{whole}</span>
             <span className="text-iri text-[58px] font-num leading-none tracking-[-0.02em]">.</span>
             <span className="text-iri text-[58px] font-num leading-none tracking-[-0.02em]">{stableDec}</span>
@@ -443,9 +468,9 @@ function StreamingCard() {
           </div>
           <div className="mt-2.5 flex items-center gap-2 text-[11.5px] text-white/40 font-mono">
             <Icon name="trending-up" size={12} className="text-emerald-300/80" />
-            <span className="text-emerald-300/80">+{(RATE).toFixed(6)} SOL/sec (demo)</span>
+            <span className="text-emerald-300/80">+{(RATE).toFixed(6)} {CARD.token}/sec (demo)</span>
             <span>·</span>
-            <span>= {(RATE * 86400).toFixed(4)} SOL/day</span>
+            <span>= {(RATE * 86400).toFixed(4)} {CARD.token}/day</span>
           </div>
         </div>
 
@@ -457,27 +482,33 @@ function StreamingCard() {
         {/* Routing details */}
         <div className="mt-6 grid grid-cols-2 gap-3 text-[12px]">
           <DetailRow label="From">
-            <span className="font-num text-white/85">{truncAddr(LANDING_STREAMING_CARD.fromAddress)}</span>
-            <span className="ml-1.5 text-white/35">({LANDING_STREAMING_CARD.fromLabel})</span>
+            <span className="font-num text-white/85">{truncAddr(CARD.fromAddress)}</span>
+            <span className="ml-1.5 text-white/35">({CARD.fromLabel})</span>
           </DetailRow>
           <DetailRow label="To">
-            <span className="font-num text-white/85">{truncAddr(LANDING_STREAMING_CARD.toAddress)}</span>
-            <span className="ml-1.5 text-white/35">({LANDING_STREAMING_CARD.toLabel})</span>
+            <span className="font-num text-white/85">{truncAddr(CARD.toAddress)}</span>
+            <span className="ml-1.5 text-white/35">({CARD.toLabel})</span>
           </DetailRow>
           <DetailRow label="Token">
-            <span className="text-white/85">{LANDING_STREAMING_CARD.token}</span>
-            <span className="ml-1.5 text-white/35">{LANDING_STREAMING_CARD.tokenKind}</span>
+            <span className="text-white/85">{CARD.token}</span>
+            <span className="ml-1.5 text-white/35">{CARD.tokenKind}</span>
           </DetailRow>
-          <DetailRow label="Yield (roadmap)">
-            <span className="text-white/35 line-through">{PROTOCOL_STATS.yieldApy.toFixed(2)}% APY</span>
-            <span className="ml-2 text-[9.5px] font-mono text-amber-300/60 uppercase tracking-[0.14em]">coming soon</span>
-          </DetailRow>
+          {!IS_STELLAR_MODE && (
+            <DetailRow label="Yield (roadmap)">
+              <span className="text-white/35 line-through">{PROTOCOL_STATS.yieldApy.toFixed(2)}% APY</span>
+              <span className="ml-2 text-[9.5px] font-mono text-amber-300/60 uppercase tracking-[0.14em]">coming soon</span>
+            </DetailRow>
+          )}
         </div>
 
         <div className="mt-5 flex items-center gap-2 pt-4 border-t border-white/5 text-[11px] text-white/40 font-mono">
           <Icon name="shield-check" size={12} className="text-violet-300" />
-          <span>Vision preview · Native SOL MVP on devnet</span>
-          <span className="ml-auto">tx {truncAddr(LANDING_STREAMING_CARD.txHash)}</span>
+          <span>
+            {IS_STELLAR_MODE
+              ? "Testnet only · native XLM · Soroban contract · Freighter required"
+              : "Vision preview · Native SOL MVP on devnet"}
+          </span>
+          <span className="ml-auto">tx {truncAddr(CARD.txHash)}</span>
         </div>
       </div>
     </div>
@@ -540,7 +571,7 @@ function PartnersStrip() {
       <div className={`max-w-[1240px] mx-auto px-6 flex items-center gap-10 flex-wrap reveal ${visible ? "in-view" : ""}`}>
         <div className="text-[11px] uppercase tracking-[0.22em] text-white/35 font-mono">Built with</div>
         <div className={`flex items-center gap-9 flex-wrap stagger-children ${visible ? "in-view" : ""}`}>
-          {LANDING_PARTNERS.map((it) => (
+          {(IS_STELLAR_MODE ? STELLAR_LANDING_PARTNERS : LANDING_PARTNERS).map((it) => (
             <span key={it} className="reveal text-white/45 hover:text-white/80 transition text-[15px] font-medium tracking-tight">
               {it}
             </span>
@@ -569,12 +600,14 @@ function WhyDrip() {
           <SectionHeader
             eyebrow="01  -  Why Drip"
             title={<>Salary is paid monthly.<br /><span className="text-white/40">Value is created by the second.</span></>}
-            sub="The lump-sum payment model is a relic of paper checks. Drip fixes the temporal mismatch between work and money."
+            sub={IS_STELLAR_MODE
+              ? "The lump-sum payment model is a relic of paper checks. Drip fixes the temporal mismatch between work and XLM on Stellar Testnet."
+              : "The lump-sum payment model is a relic of paper checks. Drip fixes the temporal mismatch between work and money."}
           />
         </div>
 
         <div ref={panels.ref} className={`mt-14 grid lg:grid-cols-2 gap-5 stagger-children ${panels.visible ? "in-view" : ""}`}>
-          {DRIP_COMPARE_PANELS.map((panel) => (
+          {(IS_STELLAR_MODE ? STELLAR_DRIP_COMPARE_PANELS : DRIP_COMPARE_PANELS).map((panel) => (
             <div key={panel.kind} className="reveal">
               <ComparePanel {...panel} />
             </div>
@@ -588,7 +621,7 @@ function WhyDrip() {
             <a href="#" className="text-[13px] text-white/55 hover:text-white flex items-center gap-1">Read the litepaper <Icon name="arrow-up-right" size={13} /></a>
           </div>
           <div className={`grid md:grid-cols-3 gap-5 stagger-children ${pillars.visible ? "in-view" : ""}`}>
-            {DRIP_PILLARS.map((pillar) => (
+            {(IS_STELLAR_MODE ? STELLAR_DRIP_PILLARS : DRIP_PILLARS).map((pillar) => (
               <div key={pillar.title} className="reveal">
                 <Pillar {...pillar} />
               </div>
@@ -741,15 +774,16 @@ function UseCases() {
 // --- Use case demos --------------------------------------------------------
 function DemoWorkforce() {
   const [paused, setPaused] = useState(false);
-  const earned = useStreamingValue(WORKFORCE_DEMO.initialEarned, WORKFORCE_DEMO.ratePerSec, !paused);
+  const WD = IS_STELLAR_MODE ? STELLAR_WORKFORCE_DEMO : WORKFORCE_DEMO;
+  const earned = useStreamingValue(WD.initialEarned, WD.ratePerSec, !paused);
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-400 to-fuchsia-500" />
           <div>
-            <div className="text-[14px] text-white">{WORKFORCE_DEMO.workerName}</div>
-            <div className="text-[11.5px] font-mono text-white/40">{WORKFORCE_DEMO.workerHandle}</div>
+            <div className="text-[14px] text-white">{WD.workerName}</div>
+            <div className="text-[11.5px] font-mono text-white/40">{WD.workerHandle}</div>
           </div>
         </div>
         <div className={`text-[11px] font-mono uppercase tracking-[0.18em] px-2.5 py-1 rounded-full border ${paused ? "border-amber-400/30 text-amber-300 bg-amber-400/5" : "border-emerald-400/30 text-emerald-300 bg-emerald-400/5"}`}>
@@ -763,13 +797,13 @@ function DemoWorkforce() {
           <span className="text-white/40 text-[20px] font-num">$</span>
           <span className="text-iri text-[40px] font-num leading-none tracking-[-0.02em]">{fmtUSD(earned, 4)}</span>
         </div>
-        <div className="mt-2 text-[11.5px] font-mono text-white/45">{WORKFORCE_DEMO.hourlyLabel}</div>
+        <div className="mt-2 text-[11.5px] font-mono text-white/45">{WD.hourlyLabel}</div>
       </div>
 
       <div className="mt-5 flex-1">
         <div className="text-[10.5px] uppercase tracking-[0.2em] text-white/40 font-mono mb-3">Active task queue</div>
         <div className="space-y-2">
-          {WORKFORCE_DEMO.tasks.map((t, i) => (
+          {WD.tasks.map((t, i) => (
             <div key={i} className={`rounded-xl border px-4 py-3 flex items-center justify-between text-[13px] ${t.state === "active" ? "border-violet-400/30 bg-violet-400/5" : "border-white/5 bg-white/[0.02]"}`}>
               <div className="flex items-center gap-3">
                 {t.state === "active" ? <span className="pulse-dot w-2 h-2 rounded-full bg-emerald-400" /> : <span className="w-2 h-2 rounded-full bg-white/20" />}
@@ -823,7 +857,7 @@ function DemoSubs() {
           </div>
           <div className="mt-2 flex items-center justify-between text-[10.5px] font-mono text-white/55">
             <span>{SUBSCRIPTION_DEMO.progressLabel}</span>
-            <span>{playing ? `STREAMING · ${SUBSCRIPTION_DEMO.ratePerSec.toFixed(6)} SOL/s (demo)` : "PAUSED · 0.000000 SOL/s"}</span>
+            <span>{playing ? `STREAMING · ${SUBSCRIPTION_DEMO.ratePerSec.toFixed(6)} ${IS_STELLAR_MODE ? "XLM" : "SOL"}/s (demo)` : `PAUSED · 0.000000 ${IS_STELLAR_MODE ? "XLM" : "SOL"}/s`}</span>
           </div>
         </div>
       </div>
@@ -854,13 +888,14 @@ function DemoAgents() {
     }, 1400);
     return () => clearInterval(id);
   }, []);
-  const events = LANDING_AGENT_DEMO.events;
+  const AGENT_DEMO = IS_STELLAR_MODE ? STELLAR_LANDING_AGENT_DEMO : LANDING_AGENT_DEMO;
+  const events = AGENT_DEMO.events;
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-[13px] sm:text-[14px] text-white">{LANDING_AGENT_DEMO.sessionName}</div>
-          <div className="text-[10px] sm:text-[11.5px] font-mono text-white/40 leading-tight">{LANDING_AGENT_DEMO.sessionMeta}</div>
+          <div className="text-[13px] sm:text-[14px] text-white">{AGENT_DEMO.sessionName}</div>
+          <div className="text-[10px] sm:text-[11.5px] font-mono text-white/40 leading-tight">{AGENT_DEMO.sessionMeta}</div>
         </div>
         <div className="text-[10px] sm:text-[11px] font-mono uppercase tracking-[0.14em] px-2 py-1 rounded-full border border-fuchsia-400/30 text-fuchsia-300 bg-fuchsia-400/5 shrink-0">
           Autonomous
@@ -887,15 +922,15 @@ function DemoAgents() {
           })}
         </div>
         <div className="mt-1.5 px-1.5 text-[9.5px] font-mono text-white/30 flex items-center gap-1 min-w-0">
-          <span className="truncate">{LANDING_AGENT_DEMO.streamId} · {tick + 1} settlements</span>
+          <span className="truncate">{AGENT_DEMO.streamId} · {tick + 1} settlements</span>
           <span className="cursor-blink text-violet-400/70 ml-0.5 shrink-0">▮</span>
         </div>
       </div>
 
       <div className="grid grid-cols-3 gap-2">
-        <MiniStat label="Settled" value={LANDING_AGENT_DEMO.totalSettled} />
-        <MiniStat label="Latency" value={LANDING_AGENT_DEMO.avgLatency} />
-        <MiniStat label="Count" value={`${tick * events.length + LANDING_AGENT_DEMO.baseSettlements}`} />
+        <MiniStat label="Settled" value={AGENT_DEMO.totalSettled} />
+        <MiniStat label="Latency" value={AGENT_DEMO.avgLatency} />
+        <MiniStat label="Count" value={`${tick * events.length + AGENT_DEMO.baseSettlements}`} />
       </div>
     </div>
   );
@@ -929,7 +964,9 @@ function Developers() {
           <SectionHeader
             eyebrow="03  -  Developer experience"
             title={<>Three lines to a live stream.</>}
-            sub="The Drip Anchor program is live on devnet. Interact directly with the IDL today, or wait for the planned drip-sol SDK."
+            sub={IS_STELLAR_MODE
+              ? "The Drip Soroban contract is live on Stellar Testnet. Call it directly with the Stellar SDK today, or wait for the planned drip-stellar SDK."
+              : "The Drip Anchor program is live on devnet. Interact directly with the IDL today, or wait for the planned drip-sol SDK."}
           />
         </div>
 
@@ -943,7 +980,7 @@ function Developers() {
         </div>
 
         <div ref={features.ref} className={`mt-6 grid md:grid-cols-3 gap-4 stagger-children ${features.visible ? "in-view" : ""}`}>
-          {DEV_FEATURES.map((feature) => (
+          {(IS_STELLAR_MODE ? STELLAR_DEV_FEATURES : DEV_FEATURES).map((feature) => (
             <div key={feature.title} className="reveal">
               <DevFeature {...feature} />
             </div>
@@ -962,14 +999,14 @@ function CodeBlock() {
           <span className="w-2.5 h-2.5 rounded-full bg-rose-400/60" />
           <span className="w-2.5 h-2.5 rounded-full bg-amber-400/60" />
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-400/60" />
-          <span className="ml-3 font-mono text-[12px] text-white/45">stream.ts</span>
+          <span className="ml-3 font-mono text-[12px] text-white/45">{IS_STELLAR_MODE ? "stellar-stream.ts" : "stream.ts"}</span>
           <span className="ml-auto flex items-center gap-3 text-[11.5px] font-mono text-white/35">
             <span>TypeScript</span>
             <span>·</span>
             <button className="hover:text-white/70 flex items-center gap-1"><Icon name="copy" size={12} /> Copy</button>
           </span>
         </div>
-        <CodeBlockHL html={DEV_CODE_SAMPLE} />
+        <CodeBlockHL html={IS_STELLAR_MODE ? STELLAR_DEV_CODE_SAMPLE : DEV_CODE_SAMPLE} />
       </div>
     </div>
   );
@@ -1020,7 +1057,7 @@ function Calculator() {
       </div>
 
       <div className="mt-6">
-        <label className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-mono">Total amount per month (SOL)</label>
+        <label className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-mono">Total amount per month ({IS_STELLAR_MODE ? "XLM" : "SOL"})</label>
         <div className="mt-2 flex items-center gap-3">
           <span className="text-white/50 text-[26px] font-num">$</span>
           <input
@@ -1048,8 +1085,8 @@ function Calculator() {
       <div className="mt-6 grid grid-cols-2 gap-2 text-[13px]">
         <CalcRow label="per second" value={`${perSec.toFixed(7)}`} accent />
         <CalcRow label="per minute" value={`${perMin.toFixed(4)}`} />
-        <CalcRow label="per hour"   value={`${perHour.toFixed(2)}`} />
-        <CalcRow label="per day"    value={`${perDay.toFixed(2)}`} />
+        <CalcRow label="per hour" value={`${perHour.toFixed(2)}`} />
+        <CalcRow label="per day" value={`${perDay.toFixed(2)}`} />
       </div>
 
       <div className="mt-6 rounded-2xl border border-violet-400/20 bg-violet-400/5 p-4">
@@ -1107,11 +1144,13 @@ function Ecosystem() {
           <SectionHeader
             eyebrow="04  -  Trust & ecosystem"
             title={<>The pipes underneath.</>}
-            sub="Drip composes with the best of Solana  -  payment, custody, and on-ramp. Yield routing via Raydium is on the roadmap."
+            sub={IS_STELLAR_MODE
+              ? "Drip is built on Stellar Testnet — Soroban contracts, Freighter custody, and Horizon RPC. Testnet only, no real funds."
+              : "Drip composes with the best of Solana  -  payment, custody, and on-ramp. Yield routing via Raydium is on the roadmap."}
           />
         </div>
         <div ref={cards.ref} className={`mt-12 grid md:grid-cols-2 lg:grid-cols-4 gap-4 stagger-children ${cards.visible ? "in-view" : ""}`}>
-          {ECOSYSTEM_PARTNERS.map((p) => (
+          {(IS_STELLAR_MODE ? STELLAR_ECOSYSTEM_PARTNERS : ECOSYSTEM_PARTNERS).map((p) => (
             <div key={p.name} className="reveal">
               <EcosystemCard p={p} />
             </div>
@@ -1137,21 +1176,25 @@ function FinalCTA() {
             <div className="relative max-w-[640px] mx-auto text-center">
               <div className="text-[11px] uppercase tracking-[0.22em] text-violet-300/70 font-mono">Start streaming</div>
               <h2 className="mt-4 text-[32px] sm:text-[42px] lg:text-[52px] leading-[1.05] font-medium tracking-[-0.025em] text-iri">
-                Make money flow at the<br />speed of the network.
+                {IS_STELLAR_MODE
+                  ? <>Make XLM flow at the<br />speed of the network.</>
+                  : <>Make money flow at the<br />speed of the network.</>}
               </h2>
               <p className="mt-5 text-[15.5px] text-white/55 leading-[1.6]">
-                Join the public devnet today. Mainnet beta opens Q3 2026 to teams already streaming.
+                {IS_STELLAR_MODE
+                  ? "Try the Stellar Testnet app today."
+                  : "Join the public devnet today. Mainnet beta opens Q3 2026 to teams already streaming."}
               </p>
               <div className="mt-9 flex items-center justify-center gap-3 flex-wrap">
                 <a href="/dashboard" className="btn-primary rounded-full px-5 py-3 text-[14px] font-medium text-white flex items-center gap-2">
-                  <Icon name="zap" size={15} /> Open Drip App
+                  <Icon name="zap" size={15} /> {IS_STELLAR_MODE ? "Open Stellar Testnet App" : "Open Drip App"}
                 </a>
                 <a href="/docs" className="btn-ghost rounded-full px-5 py-3 text-[14px] text-white/90 flex items-center gap-2">
                   <Icon name="book-open" size={15} /> Read the docs
                 </a>
               </div>
               <div className="mt-8 flex items-center justify-center gap-6 text-[11.5px] font-mono text-white/35">
-                {FINAL_CTA_STATS.map((stat, index) => (
+                {(IS_STELLAR_MODE ? STELLAR_FINAL_CTA_STATS : FINAL_CTA_STATS).map((stat, index) => (
                   <React.Fragment key={stat}>
                     {index > 0 && <span>·</span>}
                     <span>{stat}</span>
@@ -1176,7 +1219,9 @@ function Footer() {
             <span className="font-medium tracking-tight text-[16px]">Drip</span>
           </div>
           <p className="mt-4 text-[13px] text-white/50 leading-[1.6] max-w-[320px]">
-            The streaming payments layer for Solana. Built by an open collective of designers and Anchor devs in 2026.
+            {IS_STELLAR_MODE
+              ? "Programmable XLM payment streams on Stellar."
+              : "The streaming payments layer for Solana."}
           </p>
           <div className="mt-6 flex items-center gap-2 flex-wrap">
             {FOOTER_SOCIALS.map((i) => (
@@ -1203,7 +1248,7 @@ function Footer() {
       <div className="border-t border-white/5">
         <div className="max-w-[1240px] mx-auto px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[11.5px] font-mono text-white/35">
           <span>© 2026 Drip Labs · Open-source MIT</span>
-          <span>{PROTOCOL_STATS.version} · {PROTOCOL_STATS.clusterLabel} · last block {PROTOCOL_STATS.slot}</span>
+          <span>{PROTOCOL_STATS.version} · {IS_STELLAR_MODE ? STELLAR_PROTOCOL_STATS.clusterLabel : PROTOCOL_STATS.clusterLabel} · last block {IS_STELLAR_MODE ? STELLAR_PROTOCOL_STATS.slot : PROTOCOL_STATS.slot}</span>
         </div>
       </div>
     </footer>

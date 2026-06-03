@@ -329,3 +329,156 @@ export async function getStreamState(streamId: bigint): Promise<StreamStateResul
     return { ok: false, error: msg.slice(0, 200) };
   }
 }
+
+// ── Stellar history helpers ───────────────────────────────────────────────────
+
+export const EXPLORER_ACCOUNT_URL = "https://stellar.expert/explorer/testnet/account/";
+
+// Event topic names that indicate stream lifecycle activity.
+const STREAM_EVENT_TOPICS = [
+  "create_stream",
+  "cancel_stream",
+  "pause_stream",
+  "resume_stream",
+  "withdraw",
+];
+
+export type StellarHistoryItem = {
+  id: string;
+  /** "ended" = completed/cancelled, "active" = still running */
+  kind: "ended" | "cancelled" | "active";
+  /** Human-readable event type */
+  eventType: string;
+  streamId: string;
+  counterparty: string;
+  counterpartyFull: string;
+  finalXlm: number;
+  at: string;
+  durationSec: number;
+  txHash: string;
+  explorerUrl: string;
+};
+
+/** Extract a symbol name from an ScVal topic entry */
+function topicToString(val: xdr.ScVal): string {
+  try {
+    const native = scValToNative(val);
+    if (typeof native === "string") return native;
+    if (Array.isArray(native) && typeof native[0] === "string") return native[0];
+    return String(native);
+  } catch {
+    return "unknown";
+  }
+}
+
+/** Map raw event topic to a user-friendly label and kind */
+function classifyEvent(topicName: string): { label: string; kind: StellarHistoryItem["kind"] } {
+  switch (topicName) {
+    case "create_stream": return { label: "Stream Created",   kind: "active"    };
+    case "cancel_stream": return { label: "Stream Cancelled", kind: "cancelled" };
+    case "pause_stream":  return { label: "Stream Paused",    kind: "active"    };
+    case "resume_stream": return { label: "Stream Resumed",   kind: "active"    };
+    case "withdraw":      return { label: "Withdrawal",       kind: "active"    };
+    default:              return { label: topicName,          kind: "active"    };
+  }
+}
+
+/**
+ * Fetch Soroban contract events for the Drip contract using RPC getEvents.
+ * Scans the most recent ~4000 ledgers (roughly 5–6 hours on Testnet at ~5s/ledger).
+ * Falls back to an empty array on any error — never returns fake rows.
+ *
+ * walletAddress is used to label counterparty but events are fetched contract-wide
+ * since Soroban events don't expose a per-account filter at the RPC level.
+ */
+export async function fetchStellarHistory(
+  walletAddress: string,
+  limit = 50,
+): Promise<{ items: StellarHistoryItem[]; error: string | null }> {
+  if (!isConfigured()) {
+    return { items: [], error: null };
+  }
+  try {
+    const server = getServer();
+
+    // Get current ledger so we can compute a safe startLedger.
+    const health = await server.getLatestLedger();
+    const latestLedger: number = health.sequence;
+    // Scan last ~4000 ledgers ≈ ~5.5 h at 5 s/ledger on Testnet.
+    const startLedger = Math.max(1, latestLedger - 4000);
+
+    const response = await server.getEvents({
+      startLedger,
+      filters: [
+        {
+          type: "contract",
+          contractIds: [CONTRACT_ID],
+        },
+      ],
+      limit,
+    });
+
+    const events: rpc.Api.EventResponse[] = response.events ?? [];
+
+    // Sort newest-first by ledger + event id
+    const sorted = [...events].sort((a, b) => {
+      if (b.ledger !== a.ledger) return b.ledger - a.ledger;
+      return b.id.localeCompare(a.id);
+    });
+
+    const items: StellarHistoryItem[] = sorted.map((ev, i) => {
+      // topics[0] is typically the function/event name as a Symbol
+      const topicName = ev.topic.length > 0 ? topicToString(ev.topic[0]) : "event";
+      const { label, kind } = classifyEvent(topicName);
+
+      // topics[1] may contain stream ID or payer address
+      let streamId = "";
+      let counterpartyFull = "";
+      if (ev.topic.length > 1) {
+        try {
+          const t1 = scValToNative(ev.topic[1]);
+          if (typeof t1 === "bigint" || typeof t1 === "number") {
+            streamId = `#${String(t1)}`;
+          } else if (typeof t1 === "string") {
+            counterpartyFull = t1;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      const date = new Date(ev.ledgerClosedAt);
+      const atStr =
+        date.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
+        " - " +
+        date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+
+      const shortCounterparty = counterpartyFull
+        ? `${counterpartyFull.slice(0, 6)}…${counterpartyFull.slice(-4)}`
+        : (streamId || `event-${i + 1}`);
+
+      return {
+        id: ev.id,
+        kind,
+        eventType: label,
+        streamId: streamId || `#${i + 1}`,
+        counterparty: shortCounterparty,
+        counterpartyFull,
+        finalXlm: 0,
+        at: atStr,
+        durationSec: 0,
+        txHash: ev.txHash,
+        explorerUrl: `${EXPLORER_TX_URL}${ev.txHash}`,
+      };
+    });
+
+    return { items, error: null };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // getEvents can legitimately return "start ledger too old" — treat as empty, not error
+    if (msg.includes("startLedger") || msg.includes("too old") || msg.includes("not found")) {
+      return { items: [], error: null };
+    }
+    return { items: [], error: msg.slice(0, 300) };
+  }
+}

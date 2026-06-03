@@ -1030,6 +1030,9 @@ export const DOCS_SLUGS = DOCS_PAGES.filter((page) => page.slug !== "overview").
   (page) => page.slug,
 );
 
+// Slugs that are hidden/redirected in Stellar-only mode (isStellar=true).
+export const STELLAR_BLOCKED_SLUGS: string[] = ["agent", "private-alpha"];
+
 export function getDocPage(slug?: string) {
   const normalized = !slug || slug === "overview" ? "overview" : slug;
   return DOCS_PAGES.find((page) => page.slug === normalized);

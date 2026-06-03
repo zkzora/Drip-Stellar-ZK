@@ -119,6 +119,31 @@ export const DRIP_PILLARS = [
   },
 ];
 
+export const STELLAR_DRIP_PILLARS = [
+  {
+    n: "i",
+    title: "Agent-Native",
+    icon: "bot",
+    body: "Built for programmatic spending and auto-scaling. Agents hire other agents with budget caps, auto-revoke clauses, and per-token metering - no human in the loop.",
+    meta: "Spending policies · Auto-scale · Agent SDK",
+  },
+  {
+    n: "ii",
+    title: "Soroban Smart Contracts",
+    icon: "gauge",
+    body: "Leveraging Stellar's Soroban execution environment for per-second settlement. Streams settle continuously via the Drip contract — trustless, non-custodial.",
+    meta: "Stellar Testnet · Soroban · native XLM",
+    highlight: true,
+  },
+  {
+    n: "iii",
+    title: "Audit-Ready",
+    icon: "file-check-2",
+    body: "CSV exports for tax and accounting workflows. Every stream is verifiable on Stellar Expert - accountants get clean ledgers, auditors get cryptographic receipts. PDF export coming soon.",
+    meta: "CSV export live · PDF export coming next",
+  },
+];
+
 export const LANDING_USE_CASES = [
   {
     key: "workforce",
@@ -355,6 +380,13 @@ export const SETTINGS_DEFAULTS = [
   { label: "Notifications",         value: "Email + browser" },
 ];
 
+export const STELLAR_SETTINGS_DEFAULTS = [
+  { label: "Default token",         value: "XLM" },
+  { label: "Default period",        value: "per month" },
+  { label: "Network",               value: "Stellar Testnet" },
+  { label: "Notifications",         value: "Email + browser" },
+];
+
 export const NEW_STREAM_DEFAULTS = {
   recipient: "",
   token: "SOL",
@@ -418,11 +450,153 @@ export const COMPLIANCE_CATEGORY_FILTERS = [
 
 export const COMPLIANCE_DEFAULT_RANGE = { preset: "month", from: "2026-04-01", to: "2026-04-30" };
 
+// ─── Stellar Testnet overrides (used when NEXT_PUBLIC_APP_CHAIN=stellar) ────
+
+export const STELLAR_PROTOCOL_STATS: ProtocolStats = {
+  clusterLabel: "Stellar Testnet",
+  version: "v0.4.2",
+  blockTime: "5s",
+  settlement: "<6s",
+  streamFee: "0.10%",
+  rpcStatus: "RPC ok",
+  rpcSlotShort: "56,812k",
+  slot: "56,812,441",
+  complianceSlot: "56,812,504",
+  protocolStatus: "Autonomous",
+  finalityLabel: "SETTLING ON STELLAR TESTNET",
+  yieldApy: 0,
+};
+
+export const STELLAR_LANDING_PROTOCOL_STATS = [
+  { label: "Block time",  value: "5s",      hint: "Stellar Testnet" },
+  { label: "Settlement",  value: "<6s",     hint: "end to end" },
+  { label: "Stream fee",  value: "0.10%",   hint: "protocol" },
+];
+
+export const STELLAR_LANDING_STREAMING_CARD = {
+  rate: 0.000231,
+  initialValue: 4.523456,
+  startedOffsetMs: 86_400_000,
+  activeStreamId: "#4821",
+  fromAddress: "GCKF...W2XZ",
+  fromLabel: "master-agent",
+  toAddress: "GBCA...3M7Q",
+  toLabel: "deepseek-api.node",
+  token: "XLM",
+  tokenKind: "native",
+  txHash: "0x9af...c14",
+};
+
+export const STELLAR_LANDING_PARTNERS = ["Stellar", "Soroban", "Freighter", "Horizon", "Friendbot"];
+
+export const STELLAR_ECOSYSTEM_PARTNERS = [
+  { name: "Stellar",   role: "Settlement layer",    icon: "circle-dot",  note: "Testnet · Soroban smart contracts" },
+  { name: "Soroban",   role: "Smart contracts",     icon: "file-code-2", note: "Native contract execution" },
+  { name: "Freighter", role: "Wallet signer",       icon: "fingerprint", note: "Browser extension · no private keys shared" },
+  { name: "Horizon",   role: "RPC & API",           icon: "webhook",     note: "Testnet API · stream queries" },
+];
+
+export const STELLAR_FINAL_CTA_STATS = ["testnet · live", "native XLM · Soroban"];
+
+export const STELLAR_DEV_CODE_SAMPLE = `<span class="tk-c">// Drip is live on Stellar Testnet — Soroban contract</span>
+<span class="tk-c">// Connect with Freighter and call the contract below</span>
+
+<span class="tk-k">import</span> <span class="tk-p">{</span> <span class="tk-v">SorobanRpc</span><span class="tk-p">,</span> <span class="tk-v">Contract</span><span class="tk-p">,</span> <span class="tk-v">TransactionBuilder</span> <span class="tk-p">}</span> <span class="tk-k">from</span> <span class="tk-s">"@stellar/stellar-sdk"</span><span class="tk-p">;</span>
+
+<span class="tk-k">const</span> <span class="tk-v">rpc</span> <span class="tk-p">=</span> <span class="tk-k">new</span> <span class="tk-f">SorobanRpc.Server</span><span class="tk-p">(</span><span class="tk-s">"https://soroban-testnet.stellar.org"</span><span class="tk-p">);</span>
+<span class="tk-k">const</span> <span class="tk-v">contract</span> <span class="tk-p">=</span> <span class="tk-k">new</span> <span class="tk-f">Contract</span><span class="tk-p">(</span><span class="tk-v">DRIP_CONTRACT_ID</span><span class="tk-p">);</span>
+
+<span class="tk-c">// Create a stream — 0.001 XLM/sec, 0.5 XLM deposit (native XLM)</span>
+<span class="tk-k">const</span> <span class="tk-v">tx</span> <span class="tk-p">=</span> <span class="tk-k">await</span> <span class="tk-v">contract</span><span class="tk-p">.</span><span class="tk-f">call</span><span class="tk-p">(</span>
+  <span class="tk-s">"create_stream"</span><span class="tk-p">,</span>
+  <span class="tk-v">receiver</span><span class="tk-p">,</span>
+  <span class="tk-v">xdr</span><span class="tk-p">.</span><span class="tk-f">ScInt</span><span class="tk-p">(</span><span class="tk-n">10_000</span><span class="tk-p">),</span>         <span class="tk-c">// stroops per second</span>
+  <span class="tk-v">xdr</span><span class="tk-p">.</span><span class="tk-f">ScInt</span><span class="tk-p">(</span><span class="tk-n">5_000_000</span><span class="tk-p">),</span>      <span class="tk-c">// deposit (0.5 XLM in stroops)</span>
+  <span class="tk-v">xdr</span><span class="tk-p">.</span><span class="tk-f">ScInt</span><span class="tk-p">(</span><span class="tk-v">expiresAt</span><span class="tk-p">),</span>     <span class="tk-c">// unix timestamp</span>
+<span class="tk-p">);</span>
+`;
+
+export const STELLAR_DRIP_COMPARE_PANELS = [
+  {
+    kind: "old",
+    title: "The old way",
+    label: "Lump-sum, deferred",
+    timeline: [
+      { d: "Day 1",  e: "Work begins. No payment." },
+      { d: "Day 15", e: "Still working. Still nothing." },
+      { d: "Day 30", e: "Invoice sent. Wait for bank wire." },
+      { d: "Day 33", e: "First payment lands." },
+    ],
+    footer: "Counterparty risk · cash flow gaps · trust required",
+  },
+  {
+    kind: "new",
+    title: "The Drip way",
+    label: "Real-time, per-second",
+    timeline: [
+      { d: "00:00.000", e: "Stream initialized on Soroban." },
+      { d: "00:05.000", e: "First settlement (Stellar Testnet)." },
+      { d: "00:10.000", e: "Funds withdrawable via Freighter." },
+      { d: "Continuous", e: "XLM flows while value flows." },
+    ],
+    footer: "Trustless · zero gap · stop work, stop pay",
+  },
+];
+
+export const STELLAR_WORKFORCE_DEMO = {
+  initialEarned: 2418.4,
+  ratePerSec: 0.0125,
+  workerName: "Maya Chen",
+  workerHandle: "@maya",
+  hourlyLabel: "$45.00/h · 0.0125 XLM/sec (demo)",
+  tasks: [
+    { name: "Landing page redesign", rate: "$45/h", state: "active" },
+    { name: "Component library",     rate: "$45/h", state: "queued" },
+    { name: "Analytics dashboard",   rate: "$60/h", state: "queued" },
+  ],
+};
+
+export const STELLAR_LANDING_AGENT_DEMO = {
+  sessionName: "Agent mesh · session 1f4e",
+  sessionMeta: "4 agents · 12 sub-streams · Freighter signed",
+  streamId: "stream://1f4e",
+  totalSettled: "0.000745 XLM",
+  avgLatency: "5.2s",
+  baseSettlements: 12,
+  events: [
+    { from: "agent.research",   to: "agent.summarize",  amt: "0.000412", note: "tools/web_search · 1.2k tok" },
+    { from: "agent.summarize",  to: "agent.editor",     amt: "0.000208", note: "compose/draft · 800 tok" },
+    { from: "agent.editor",     to: "agent.publisher",  amt: "0.000094", note: "deliver/markdown · 240 tok" },
+    { from: "agent.publisher",  to: "human.eli",        amt: "0.000031", note: "notify/payout · final" },
+  ],
+};
+
+export const STELLAR_DEV_FEATURES = [
+  { icon: "package",      title: "drip-stellar SDK (planned)", desc: "TypeScript client for the Drip Soroban contract — in development. Interact via the contract ABI today." },
+  { icon: "webhook",      title: "Stream webhooks (roadmap)",  desc: "React to create, pause, withdraw, and cancel events via Horizon event streaming." },
+  { icon: "file-code-2",  title: "Soroban contract — live on testnet", desc: "On-chain Soroban contract is open-source. Testnet only — no real funds." },
+];
+
 export const COMPLIANCE_EXPORT = {
   pageSize: 6,
   taxRate: 0.1,
   networkLabel: "Solana devnet",
   ledgerNetworkLabel: "Solana Devnet",
+  integrations: ["Xero (planned)", "QuickBooks (planned)", "Wave (planned)"],
+  fileStem: "Apr2026",
+  secondaryActions: [
+    { icon: "mail",             label: "Email to accountant",    sub: "One-tap delivery" },
+    { icon: "file-spreadsheet", label: "Export CSV for Xero",    sub: "Coming soon - chart-of-accounts map" },
+    { icon: "webhook",          label: "Sync to QuickBooks",     sub: "Coming soon - OAuth sync" },
+    { icon: "calendar-clock",   label: "Schedule monthly",       sub: "Auto-generate on the 1st" },
+  ],
+};
+
+export const STELLAR_COMPLIANCE_EXPORT = {
+  pageSize: 6,
+  taxRate: 0.1,
+  networkLabel: "Stellar Testnet",
+  ledgerNetworkLabel: "Stellar Testnet",
   integrations: ["Xero (planned)", "QuickBooks (planned)", "Wave (planned)"],
   fileStem: "Apr2026",
   secondaryActions: [

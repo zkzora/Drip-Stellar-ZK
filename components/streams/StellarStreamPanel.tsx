@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { useFreighterWallet } from "@/lib/stellar/useFreighterWallet";
 import { signStellarTx } from "@/lib/stellar/wallet";
@@ -16,6 +16,7 @@ import {
   type BuildResult as StellarBuildResult,
   type StreamState as StellarStreamState,
 } from "@/lib/stellar/transactions";
+import type { UseStellarStreamsReturn, TrackedStream } from "@/lib/stellar/useStellarStreams";
 
 // =========================================================================
 // HELPERS (top-level so sub-components can use them)
@@ -738,13 +739,187 @@ function StellarNewStreamDrawer({
 }
 
 // =========================================================================
+// STELLAR TRACKED STREAM CARD
+// Self-contained card that manages its own tx phase state, enabling
+// multiple independent stream cards to coexist.
+// =========================================================================
+function StellarTrackedStreamCard({
+  stream,
+  freighter,
+  onRemove,
+}: {
+  stream: TrackedStream;
+  freighter: ReturnType<typeof useFreighterWallet>;
+  onRemove?: (streamId: string) => void;
+}) {
+  const [txPhase, setTxPhase] = useState<TxPhase>("idle");
+  const [txError, setTxError] = useState<string | null>(null);
+  const [pendingXdr, setPendingXdr] = useState<string | null>(null);
+  const [previewInfo, setPreviewInfo] = useState<PreviewInfo | null>(null);
+  const [txResult, setTxResult] = useState<{ txHash?: string; returnValue?: unknown } | null>(null);
+  // Local mirror of on-chain state — refreshed after each tx
+  const [localState, setLocalState] = useState<StellarStreamState | null>(stream.onChainState);
+
+  useEffect(() => {
+    setLocalState(stream.onChainState);
+  }, [stream.onChainState]);
+
+  const resetTx = useCallback(() => {
+    setTxPhase("idle");
+    setTxError(null);
+    setPendingXdr(null);
+    setPreviewInfo(null);
+    setTxResult(null);
+  }, []);
+
+  const handleBuild = useCallback(
+    async (buildFn: () => Promise<StellarBuildResult>, preview: PreviewInfo) => {
+      setTxPhase("building");
+      setTxError(null);
+      const result = await buildFn();
+      if (!result.ok || !result.txXdr) {
+        setTxPhase("error");
+        setTxError(result.error ?? "Failed to build transaction.");
+        return;
+      }
+      setPendingXdr(result.txXdr);
+      setPreviewInfo(preview);
+      setTxPhase("preview");
+    },
+    [],
+  );
+
+  const handleSign = useCallback(async () => {
+    if (!pendingXdr || !freighter.networkPassphrase) return;
+    setTxPhase("signing");
+    const signResult = await signStellarTx(pendingXdr, freighter.networkPassphrase);
+    if (!signResult.ok || !signResult.signedTxXdr) {
+      setTxPhase("error");
+      setTxError(signResult.error ?? "Signing cancelled or failed.");
+      return;
+    }
+    setTxPhase("submitting");
+    const submitResult = await submitStellarTx(signResult.signedTxXdr);
+    if (!submitResult.ok) {
+      setTxPhase("error");
+      setTxError(submitResult.error ?? "Submission failed.");
+      return;
+    }
+    setTxResult({ txHash: submitResult.txHash, returnValue: submitResult.returnValue });
+    setTxPhase("done");
+    // Refresh on-chain state after a brief delay
+    setTimeout(async () => {
+      try {
+        const r = await getStreamState(BigInt(stream.streamId));
+        if (r.ok && r.stream) setLocalState(r.stream);
+      } catch { /* ignore */ }
+    }, 3500);
+  }, [pendingXdr, freighter.networkPassphrase, stream.streamId]);
+
+  const handleAction = useCallback(
+    async (action: "pause" | "resume" | "withdraw" | "cancel") => {
+      if (!freighter.address) return;
+      const streamId = BigInt(stream.streamId);
+      const buildFns: Record<string, () => Promise<StellarBuildResult>> = {
+        pause:    () => buildPauseStream(  { callerAddress: freighter.address!, streamId }),
+        resume:   () => buildResumeStream( { callerAddress: freighter.address!, streamId }),
+        withdraw: () => buildWithdraw(     { callerAddress: freighter.address!, streamId }),
+        cancel:   () => buildCancelStream( { callerAddress: freighter.address!, streamId }),
+      };
+      const labels: Record<string, string> = {
+        pause: "Pause Stream", resume: "Resume Stream", withdraw: "Withdraw", cancel: "Cancel Stream",
+      };
+      await handleBuild(buildFns[action], { actionLabel: labels[action], streamId: stream.streamId });
+    },
+    [freighter.address, stream.streamId, handleBuild],
+  );
+
+  const actionEnabled = (action: "pause" | "resume" | "withdraw" | "cancel"): boolean => {
+    const s = localState?.status;
+    if (!s) return false;
+    if (action === "pause")    return s === "Active";
+    if (action === "resume")   return s === "Paused";
+    if (action === "withdraw") return s === "Active";
+    if (action === "cancel")   return s !== "Cancelled" && s !== "Completed";
+    return true;
+  };
+
+  // Loading skeleton
+  if (stream.isLoading && !localState) {
+    return (
+      <div className="rounded-2xl glass p-5 space-y-3 animate-pulse">
+        <div className="h-3 bg-white/5 rounded w-1/3" />
+        <div className="h-7 bg-white/5 rounded w-1/2" />
+        <div className="h-2 bg-white/5 rounded w-full" />
+      </div>
+    );
+  }
+
+  // Error / not found state
+  if (!localState) {
+    return (
+      <div className="rounded-2xl glass p-4 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[12px] font-mono text-white/55">Stream #{stream.streamId}</div>
+          <div className="mt-1 text-[11.5px] text-rose-300/70 flex items-center gap-1.5">
+            <Icon name="triangle-alert" size={11} className="shrink-0" />
+            <span className="truncate">{stream.loadError ?? "State unavailable — ledger entry may have expired."}</span>
+          </div>
+          <div className="mt-1.5 text-[10.5px] font-mono text-white/30">Last known: {stream.lastKnownStatus}</div>
+        </div>
+        {onRemove && (
+          <button
+            onClick={() => onRemove(stream.streamId)}
+            className="shrink-0 text-white/25 hover:text-rose-300 transition"
+            title="Remove from local list"
+          >
+            <Icon name="x" size={13} />
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative group">
+      <StellarStreamCard
+        stream={localState}
+        streamId={stream.streamId}
+        txPhase={txPhase}
+        txError={txError}
+        txResult={txResult}
+        previewInfo={previewInfo}
+        onPause={() => handleAction("pause")}
+        onResume={() => handleAction("resume")}
+        onWithdraw={() => handleAction("withdraw")}
+        onCancel={() => handleAction("cancel")}
+        onSign={handleSign}
+        onReset={resetTx}
+        actionEnabled={actionEnabled}
+      />
+      {onRemove && (
+        <button
+          onClick={() => onRemove(stream.streamId)}
+          className="absolute top-3 right-11 opacity-0 group-hover:opacity-100 transition text-white/20 hover:text-white/60"
+          title="Remove from local list"
+        >
+          <Icon name="x" size={11} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// =========================================================================
 // STELLAR STREAM PANEL — main export
 // Rendered in StreamsPage → Stellar Testnet tab.
 // =========================================================================
 export function StellarStreamPanel({
   freighter,
+  stellarStreams,
 }: {
   freighter: ReturnType<typeof useFreighterWallet>;
+  stellarStreams?: UseStellarStreamsReturn;
 }) {
   const contractConfigured = !!(
     process.env.NEXT_PUBLIC_STELLAR_CONTRACT_ID &&
@@ -777,6 +952,11 @@ export function StellarStreamPanel({
   const [pendingXdr,   setPendingXdr]   = useState<string | null>(null);
   const [previewInfo,  setPreviewInfo]  = useState<PreviewInfo | null>(null);
   const [txResult,     setTxResult]     = useState<{ txHash?: string; returnValue?: unknown } | null>(null);
+
+  // Refs to carry create-stream context into handleSign (cannot use state
+  // because handleSign closes over stale values if set asynchronously).
+  const pendingStroopsRef  = useRef<string>("0");
+  const pendingReceiverRef = useRef<string>("");
 
   // ── Validation ───────────────────────────────────────────────────────────
   const isValidGAddr = (addr: string) => /^G[A-Z2-7]{55}$/.test(addr);
@@ -839,21 +1019,43 @@ export function StellarStreamPanel({
     }
     setTxResult({ txHash: submitResult.txHash, returnValue: submitResult.returnValue });
     setTxPhase("done");
-    // Auto-refresh stream state after action on an existing stream
-    if (manageId && manageIdValid) {
+
+    // ── Save new stream to registry ────────────────────────────────────────
+    // Only applies to create_stream (previewInfo.actionLabel === "Create Stream").
+    // The contract returns the new stream ID as returnValue when successful.
+    const isCreate = previewInfo?.actionLabel === "Create Stream";
+    if (isCreate && freighter.address && stellarStreams && submitResult.returnValue !== undefined) {
+      const rawId = String(submitResult.returnValue);
+      if (/^\d+$/.test(rawId)) {
+        stellarStreams.addStream({
+          streamId: rawId,
+          payer: freighter.address,
+          receiver: pendingReceiverRef.current,
+          amountStroops: pendingStroopsRef.current,
+          createdTxHash: submitResult.txHash,
+          createdAt: new Date().toISOString(),
+          lastKnownStatus: "Active",
+          lastLoadedAt: new Date().toISOString(),
+        });
+      }
+    }
+
+    // Auto-refresh state for manage-stream actions (legacy single-stream view)
+    if (!isCreate && manageId && manageIdValid) {
       setTimeout(async () => {
         try {
           const r = await getStreamState(BigInt(manageId.trim()));
           if (r.ok && r.stream) setLoadedStream(r.stream);
-        } catch {
-          // ignore refresh errors
-        }
+        } catch { /* ignore */ }
       }, 3500);
     }
-  }, [pendingXdr, freighter.networkPassphrase, manageId, manageIdValid]);
+  }, [pendingXdr, freighter.networkPassphrase, previewInfo, freighter.address, stellarStreams, manageId, manageIdValid]);
 
   const handleCreateStream = useCallback(async () => {
     if (!freighter.address || !amountStroops) return;
+    // Capture context for the registry save that happens in handleSign
+    pendingReceiverRef.current = createReceiver;
+    pendingStroopsRef.current  = amountStroops.toString();
     const nowSecs     = Math.floor(Date.now() / 1000);
     const durationSecs = Math.round(parseFloat(createDurationHours) * 3600);
     const endTime     = nowSecs + durationSecs;
@@ -910,11 +1112,27 @@ export function StellarStreamPanel({
     setStreamLoading(false);
     if (r.ok && r.stream) {
       setLoadedStream(r.stream);
+      // Save to registry if payer or receiver matches connected wallet
+      const matches =
+        freighter.address &&
+        (r.stream.payer === freighter.address || r.stream.receiver === freighter.address);
+      if (matches && freighter.address && stellarStreams) {
+        stellarStreams.addStream({
+          streamId: manageId.trim(),
+          payer: r.stream.payer,
+          receiver: r.stream.receiver,
+          amountStroops: r.stream.amount,
+          lastKnownStatus: r.stream.status,
+          lastLoadedAt: new Date().toISOString(),
+        });
+      } else if (freighter.address && !matches) {
+        setStreamLoadError(`Stream #${manageId.trim()} loaded but not saved — your wallet is not payer or receiver.`);
+      }
     } else {
       setStreamLoadError(r.error ?? "Failed to load stream.");
       setLoadedStream(null);
     }
-  }, [manageId, manageIdValid, resetTx]);
+  }, [manageId, manageIdValid, resetTx, freighter.address, stellarStreams]);
 
   const actionEnabled = (action: "pause" | "resume" | "withdraw" | "cancel"): boolean => {
     if (!loadedStream) return true; // allow; contract enforces auth & status
@@ -1042,47 +1260,111 @@ export function StellarStreamPanel({
             </p>
           )}
 
-          {/* Load error */}
+          {/* Load error / info */}
           {streamLoadError && (
-            <div className="flex items-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/5 px-4 py-2.5">
-              <Icon name="triangle-alert" size={12} className="text-rose-300 shrink-0" />
-              <p className="text-[12px] text-rose-200/80">{streamLoadError}</p>
+            <div className="flex items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-400/5 px-4 py-2.5">
+              <Icon name="info" size={12} className="text-amber-300 shrink-0" />
+              <p className="text-[12px] text-amber-200/80">{streamLoadError}</p>
             </div>
           )}
 
-          {/* Stream card grid */}
-          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {!loadedStream ? (
-              /* Empty state — simple text, no decorative icon */
-              <div className="col-span-full py-8 px-4">
-                <div className="text-[14px] text-white/50">No Stellar stream loaded</div>
-                <div className="mt-1 text-[12px] font-mono text-white/30">
-                  Create a new XLM stream or enter a stream ID above to load one.
+          {/* ── My Stellar Streams ── */}
+          <div className="space-y-3">
+            {/* Header row */}
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] uppercase tracking-[0.18em] text-white/40 font-mono">My Stellar Streams</span>
+                {stellarStreams && stellarStreams.count > 0 && (
+                  <span className="text-[10.5px] font-mono px-1.5 py-0.5 rounded-full bg-sky-400/10 text-sky-300">
+                    {stellarStreams.count}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {stellarStreams && !stellarStreams.loading && (
+                  <button
+                    onClick={() => void stellarStreams.refresh()}
+                    className="text-[11px] font-mono text-white/30 hover:text-white/60 flex items-center gap-1 transition"
+                    title="Refresh all streams"
+                  >
+                    <Icon name="rotate-ccw" size={11} /> Refresh
+                  </button>
+                )}
+                {stellarStreams && stellarStreams.count > 0 && (
+                  <button
+                    onClick={stellarStreams.clearAll}
+                    className="text-[11px] font-mono text-white/25 hover:text-rose-300 transition"
+                    title="Clear local tracked stream list"
+                  >
+                    Clear local list
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Loading state */}
+            {stellarStreams?.loading && (
+              <div className="flex items-center gap-2 text-[12px] text-white/45 font-mono px-1">
+                <span className="inline-block w-3 h-3 rounded-full border-2 border-sky-300 border-t-transparent animate-spin" />
+                Loading stream states…
+              </div>
+            )}
+
+            {/* Tracked stream cards */}
+            {stellarStreams && !stellarStreams.loading && stellarStreams.streams.length > 0 && (
+              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {stellarStreams.streams.map((stream) => (
+                  <StellarTrackedStreamCard
+                    key={stream.streamId}
+                    stream={stream}
+                    freighter={freighter}
+                    onRemove={stellarStreams.removeStream}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Empty state — no tracked streams */}
+            {stellarStreams && !stellarStreams.loading && stellarStreams.streams.length === 0 && (
+              <div className="rounded-2xl glass p-8 text-center space-y-2">
+                <div className="text-[14px] text-white/50">No Stellar streams tracked yet.</div>
+                <div className="text-[12px] font-mono text-white/30">
+                  Create a new XLM stream or load an existing stream ID to get started.
                 </div>
                 <button
                   onClick={() => { resetTx(); setDrawerOpen(true); }}
-                  className="mt-4 btn-primary rounded-full px-4 py-2 text-[12.5px] font-medium text-white inline-flex items-center gap-1.5"
+                  className="mt-3 btn-primary rounded-full px-4 py-2 text-[12.5px] font-medium text-white inline-flex items-center gap-1.5"
                 >
                   <Icon name="plus" size={12} /> New XLM stream
                 </button>
               </div>
-            ) : (
-              /* Loaded stream card */
-              <StellarStreamCard
-                stream={loadedStream}
-                streamId={manageId}
-                txPhase={txPhase}
-                txError={txError}
-                txResult={txResult}
-                previewInfo={previewInfo}
-                onPause={() => handleAction("pause")}
-                onResume={() => handleAction("resume")}
-                onWithdraw={() => handleAction("withdraw")}
-                onCancel={() => handleAction("cancel")}
-                onSign={handleSign}
-                onReset={resetTx}
-                actionEnabled={actionEnabled}
-              />
+            )}
+
+            {/* Fallback when no registry prop — old single-stream view */}
+            {!stellarStreams && (
+              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {loadedStream ? (
+                  <StellarStreamCard
+                    stream={loadedStream}
+                    streamId={manageId}
+                    txPhase={txPhase}
+                    txError={txError}
+                    txResult={txResult}
+                    previewInfo={previewInfo}
+                    onPause={() => handleAction("pause")}
+                    onResume={() => handleAction("resume")}
+                    onWithdraw={() => handleAction("withdraw")}
+                    onCancel={() => handleAction("cancel")}
+                    onSign={handleSign}
+                    onReset={resetTx}
+                    actionEnabled={actionEnabled}
+                  />
+                ) : (
+                  <div className="col-span-full py-8 px-4 text-[14px] text-white/50">
+                    Enter a stream ID above to load it.
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </>

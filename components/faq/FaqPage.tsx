@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { DocsBackground } from "@/components/ui/backgrounds";
+import { IS_STELLAR_MODE } from "@/lib/app-config";
 
 const CATEGORIES = [
   { id: "general",   label: "General",      icon: "layers" },
   { id: "streams",   label: "Streams",      icon: "waves" },
-  { id: "wallet",    label: "Wallet & SOL", icon: "wallet" },
+  { id: "wallet",    label: IS_STELLAR_MODE ? "Wallet & XLM" : "Wallet & SOL", icon: "wallet" },
   { id: "agents",    label: "Agents",       icon: "bot" },
   { id: "technical", label: "Technical",    icon: "code-2" },
   { id: "roadmap",   label: "Roadmap",      icon: "map" },
@@ -233,6 +234,10 @@ function AccordionItem({
   );
 }
 
+const STELLAR_FAQ_NOTICE = IS_STELLAR_MODE
+  ? "This FAQ covers the Stellar Testnet version of Drip. Streams use native XLM via Soroban smart contracts and Freighter wallet. Testnet only — no real funds."
+  : null;
+
 export default function FaqPage() {
   const [activeCategory, setActiveCategory] = useState("general");
   const [openIdx, setOpenIdx] = useState<number | null>(0);
@@ -394,6 +399,13 @@ export default function FaqPage() {
                 {items.length} questions
               </span>
             </div>
+
+            {STELLAR_FAQ_NOTICE && (
+              <div className="rounded-xl border border-sky-400/25 bg-sky-400/[0.06] px-4 py-3 flex items-start gap-3 mb-2">
+                <Icon name="shield-check" size={14} className="text-sky-300 shrink-0 mt-0.5" />
+                <p className="text-[12.5px] text-sky-100/80 leading-relaxed">{STELLAR_FAQ_NOTICE}</p>
+              </div>
+            )}
 
             {items.map((item, i) => (
               <AccordionItem
