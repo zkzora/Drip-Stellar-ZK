@@ -335,17 +335,7 @@ function Hero() {
     <section className="relative pt-16 pb-28">
       <div className="max-w-[1240px] mx-auto px-6 grid lg:grid-cols-12 gap-10 items-start">
         <div className="lg:col-span-7 pt-8">
-          {/* Badge */}
-          <div className="anim-fade-down delay-0 inline-flex items-center gap-2 rounded-full border border-violet-400/25 bg-violet-400/5 px-3 py-1.5 text-[12px] text-violet-200/90 mb-7">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="absolute inline-flex h-full w-full rounded-full bg-violet-300 opacity-75 animate-ping" />
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-violet-300" />
-            </span>
-            <span className="font-mono uppercase tracking-[0.16em]">
-              {IS_STELLAR_MODE ? "Now live on Stellar Testnet" : "Now live on Solana devnet"}
-            </span>
 
-          </div>
 
           {/* Headline */}
           <h1 className="anim-fade-up delay-80 text-[38px] sm:text-[52px] lg:text-[68px] leading-[1.02] font-medium tracking-[-0.025em] text-iri-anim">
