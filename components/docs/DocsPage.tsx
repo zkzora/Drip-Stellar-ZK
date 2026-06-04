@@ -308,6 +308,17 @@ function NextPrevious({ page }: { page: DocPage }) {
 }
 
 export default function DocsPage({ page }: { page: DocPage }) {
+  // In Stellar mode, swap in the Stellar-specific content when available
+  const resolved: DocPage = IS_STELLAR_MODE && page.stellarOverride
+    ? {
+        ...page,
+        title:       page.stellarOverride.title,
+        lead:        page.stellarOverride.lead,
+        description: page.stellarOverride.description,
+        sections:    page.stellarOverride.sections,
+      }
+    : page;
+
   return (
     <div className="min-h-screen bg-[#070612] relative">
       <DocsBackground />
@@ -319,7 +330,7 @@ export default function DocsPage({ page }: { page: DocPage }) {
           <div className="mb-3 px-3 text-[10px] font-mono uppercase tracking-[0.2em] text-white/35">
             Docs
           </div>
-          <DocsNav activeSlug={page.slug} />
+          <DocsNav activeSlug={resolved.slug} />
           {IS_STELLAR_MODE ? (
             <div className="mt-8 rounded-xl border border-cyan-400/20 bg-cyan-400/[0.05] p-4">
               <div className="flex items-center gap-2 text-[12px] font-medium text-white">
@@ -344,14 +355,14 @@ export default function DocsPage({ page }: { page: DocPage }) {
         </aside>
 
         <main className="min-w-0 flex-1 px-4 py-9 pb-24 sm:px-8 lg:px-12">
-          <MobileDocsNav activeTitle={page.navTitle} activeSlug={page.slug} />
-          <PageHero page={page} />
+          <MobileDocsNav activeTitle={resolved.navTitle} activeSlug={resolved.slug} />
+          <PageHero page={resolved} />
           <div className="space-y-12">
-            {page.sections.map((section, index) => (
+            {resolved.sections.map((section, index) => (
               <RenderSection key={`${section.type}-${section.title}-${index}`} section={section} />
             ))}
           </div>
-          <NextPrevious page={page} />
+          <NextPrevious page={resolved} />
         </main>
       </div>
     </div>
