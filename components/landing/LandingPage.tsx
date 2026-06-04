@@ -32,6 +32,7 @@ import {
   STELLAR_LANDING_PARTNERS,
   STELLAR_LANDING_PROTOCOL_STATS,
   STELLAR_LANDING_STREAMING_CARD,
+  STELLAR_LANDING_USE_CASES,
   STELLAR_PROTOCOL_STATS,
   STELLAR_WORKFORCE_DEMO,
   SUBSCRIPTION_DEMO,
@@ -706,11 +707,13 @@ function SectionHeader({ eyebrow, title, sub }: any) {
 // Use cases  -  tabbed
 // =========================================================================
 function UseCases() {
+  const USE_CASES = IS_STELLAR_MODE ? STELLAR_LANDING_USE_CASES : LANDING_USE_CASES;
   const [active, setActive] = useState(0);
-  const c = LANDING_USE_CASES[active];
+  const c = USE_CASES[active];
   const header = useInView(0.1);
   const tabs = useInView(0.1);
   const detail = useInView(0.1);
+  const useCaseCount = USE_CASES.length;
 
   return (
     <section id="use-cases" className="relative py-16 sm:py-28">
@@ -718,14 +721,18 @@ function UseCases() {
         <div ref={header.ref} className={`reveal ${header.visible ? "in-view" : ""}`}>
           <SectionHeader
             eyebrow="02  -  Use cases"
-            title={<>Three economies. <span className="text-white/40">One protocol.</span></>}
-            sub="Drip is a primitive  -  anywhere money should match the cadence of work, attention, or compute, it fits."
+            title={useCaseCount === 2
+              ? <>Two ways to <span className="text-white/40">stream value.</span></>
+              : <>Three economies. <span className="text-white/40">One protocol.</span></>}
+            sub={IS_STELLAR_MODE
+              ? "Stream XLM on Stellar Testnet for work, services, and controlled fund movement."
+              : "Drip is a primitive  -  anywhere money should match the cadence of work, attention, or compute, it fits."}
           />
         </div>
 
         {/* Tabs */}
-        <div ref={tabs.ref} className={`mt-12 grid md:grid-cols-3 gap-3 stagger-children ${tabs.visible ? "in-view" : ""}`}>
-          {LANDING_USE_CASES.map((cc, i) => (
+        <div ref={tabs.ref} className={`mt-12 grid ${useCaseCount <= 2 ? "md:grid-cols-2" : "md:grid-cols-3"} gap-3 stagger-children ${tabs.visible ? "in-view" : ""}`}>
+          {USE_CASES.map((cc, i) => (
             <button
               key={cc.key}
               onClick={() => setActive(i)}
@@ -763,6 +770,7 @@ function UseCases() {
               {c.demo === "workforce" && <DemoWorkforce />}
               {c.demo === "subs" && <DemoSubs />}
               {c.demo === "agents" && <DemoAgents />}
+              {c.demo === "protocols" && <DemoProtocols />}
             </div>
           </div>
         </div>
@@ -931,6 +939,59 @@ function DemoAgents() {
         <MiniStat label="Settled" value={AGENT_DEMO.totalSettled} />
         <MiniStat label="Latency" value={AGENT_DEMO.avgLatency} />
         <MiniStat label="Count" value={`${tick * events.length + AGENT_DEMO.baseSettlements}`} />
+      </div>
+    </div>
+  );
+}
+
+function DemoProtocols() {
+  return (
+    <div className="h-full flex flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-500" />
+          <div>
+            <div className="text-[14px] text-white">Streamed withdrawal</div>
+            <div className="text-[11.5px] font-mono text-white/40">Native XLM · Soroban · Freighter signed</div>
+          </div>
+        </div>
+        <div className="text-[11px] font-mono uppercase tracking-[0.18em] px-2.5 py-1 rounded-full border border-sky-400/30 text-sky-300 bg-sky-400/5">
+          Testnet
+        </div>
+      </div>
+
+      {/* Event log */}
+      <div className="mt-5 rounded-xl border border-white/5 bg-white/[0.02] p-3 space-y-1.5 flex-1">
+        <div className="text-[9.5px] uppercase tracking-[0.2em] text-white/40 font-mono mb-2">Event log</div>
+        {[
+          ["withdrawal.requested", "stream.created"],
+          ["stream.active",        "vested.amount"],
+          ["stream.paused",        "review.started"],
+          ["stream.cancelled",     "unvested.protected"],
+        ].map(([from, to]) => (
+          <div key={from + to} className="px-2 py-1.5 rounded-lg border border-transparent flex items-center gap-1.5 min-w-0">
+            <span className="font-mono text-[10.5px] text-emerald-300 truncate">{from}</span>
+            <Icon name="arrow-right" size={9} className="text-white/30 shrink-0" />
+            <span className="font-mono text-[10.5px] text-sky-300 truncate">{to}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Stats grid */}
+      <div className="mt-4 grid grid-cols-3 gap-2">
+        <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
+          <div className="text-[9px] uppercase tracking-[0.14em] text-white/40 font-mono">Streamed</div>
+          <div className="mt-0.5 text-[15px] font-num text-emerald-300 num-stable">5.0000 XLM</div>
+        </div>
+        <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
+          <div className="text-[9px] uppercase tracking-[0.14em] text-white/40 font-mono">Withdrawn</div>
+          <div className="mt-0.5 text-[15px] font-num text-sky-300 num-stable">1.2500 XLM</div>
+        </div>
+        <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
+          <div className="text-[9px] uppercase tracking-[0.14em] text-white/40 font-mono">Remaining</div>
+          <div className="mt-0.5 text-[15px] font-num text-white num-stable">3.7500 XLM</div>
+        </div>
       </div>
     </div>
   );

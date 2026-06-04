@@ -186,6 +186,48 @@ export const LANDING_USE_CASES = [
   },
 ];
 
+export const STELLAR_LANDING_USE_CASES = [
+  {
+    key: "workforce",
+    tag: "FOR HUMANS",
+    title: "Builder & contributor payouts.",
+    lede: "Pay freelancers per second of work. Stop the task — stop the pay. No invoices, no Net-30, no awkward follow-ups.",
+    icon: "briefcase-business",
+    bullets: [
+      "Pause/resume from any device, instantly mirrored on-chain.",
+      "Per-second XLM precision — fairer than hourly.",
+      "Withdraw anytime, even mid-stream. No locked balances.",
+    ],
+    demo: "workforce",
+  },
+  {
+    key: "subs",
+    tag: "FOR PRODUCTS",
+    title: "Subscriptions & service payments.",
+    lede: "Charge for media or SaaS only for the exact seconds used. The death of the forgotten recurring charge.",
+    icon: "play-circle",
+    bullets: [
+      "Pay-as-you-watch streaming — XLM/sec instead of monthly.",
+      "API rate-metered billing — per-call, per-second.",
+      "Cancel by closing the tab. Refunds are automatic.",
+    ],
+    demo: "subs",
+  },
+  {
+    key: "protocols",
+    tag: "FOR PROTOCOLS",
+    title: "Controlled fund movement.",
+    lede: "Large or sensitive payments should not always leave instantly. DRIP can model payouts as streams, giving teams a way to move value over time instead of all at once.",
+    icon: "shield-check",
+    bullets: [
+      "Stream large XLM payouts over time.",
+      "Pause or cancel unvested funds when needed.",
+      "Reduce instant-drain risk for protocol treasuries and workflows.",
+    ],
+    demo: "protocols",
+  },
+];
+
 export const WORKFORCE_DEMO = {
   initialEarned: 2418.4,
   ratePerSec: 0.0125,
