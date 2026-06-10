@@ -6,10 +6,7 @@
 ![Contract Tests](https://img.shields.io/badge/contract%20tests-14%2F14%20passing-brightgreen?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square)
 
-**Programmable cashflow for AI agents and modern workforces.**
-
-> Give AI agents a budget that streams, stops, and audits itself.  
-> Agents should not receive lump sums. They should receive revocable real-time budgets.
+**Real-time XLM streaming payments on Stellar.**
 
 Drip is a streaming payments protocol built on **Stellar Soroban**. Set a flow rate, a max budget, and an expiry — then let the escrow stream XLM by the second with full on-chain enforcement.
 
@@ -105,11 +102,10 @@ See [DEMO.md](DEMO.md) for the full demo script and walkthrough.
 - CSV export (22 columns, Excel-compatible)
 - Audit-ready transaction logs with category filtering and date range selection
 
-### ✅ Agent Terminal
+### 🚧 Agent Terminal (Demo UI)
 
-- Live inference log and real-time spend counter
-- Budget panel wired to real on-chain stream state when a wallet is connected
-- Demonstrates the autonomous agent-to-agent payment model
+- Spend counter UI wired to real on-chain stream state when a wallet is connected
+- Visual simulation only — no real agent execution
 
 ---
 
@@ -146,7 +142,7 @@ npm run typecheck
 |------------------|--------------------------------------------------------------|
 | Token            | **XLM only** — other Stellar assets on roadmap              |
 | PDF export       | Stub — shows "coming soon" toast                            |
-| Agent terminal   | Demo simulation — not real on-chain agent execution         |
+| Agent terminal   | UI demo only — no real agent integration                    |
 | Deployment       | **Testnet only** — mainnet pending security review          |
 
 ---
@@ -156,7 +152,7 @@ npm run typecheck
 | Feature                      | Status                                                         |
 |------------------------------|----------------------------------------------------------------|
 | XLM streaming                | ✅ Contract deployed, UI integrated on testnet                 |
-| Agent autopilot withdrawals  | Planned — automated pull from on-chain stream balance         |
+| Scheduled withdrawals        | Planned — automated pull from on-chain stream balance         |
 | Multi-asset support          | Planned — other Stellar assets beyond XLM                     |
 | PDF audit export             | Planned — PDF generation for the compliance page              |
 | `drip-stellar` SDK package   | Planned — lightweight TypeScript client on npm                |
@@ -166,7 +162,7 @@ npm run typecheck
 
 ## License
 
-All rights reserved. This repository is publicly visible for reference purposes only. Copying, redistribution, or use of this code without explicit permission is not permitted.
+MIT — see [LICENSE](LICENSE) for details.
 
 ---
 
@@ -176,4 +172,4 @@ See [DEMO.md](DEMO.md) for the full demo script and walkthrough.
 
 ---
 
-Built with ❤️ for the autonomous agent economy
+Built with ❤️ on Stellar
