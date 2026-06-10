@@ -164,21 +164,9 @@ npm run typecheck
 
 ---
 
-## Contributing
-
-Contributions are welcome! This project is open source under the MIT license.
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/your-feature`
-3. Commit your changes: `git commit -m 'feat: add your feature'`
-4. Push: `git push origin feature/your-feature`
-5. Open a Pull Request
-
----
-
 ## License
 
-MIT — see [LICENSE](LICENSE) for details.
+All rights reserved. This repository is publicly visible for reference purposes only. Copying, redistribution, or use of this code without explicit permission is not permitted.
 
 ---
 
