@@ -152,7 +152,7 @@ npm run typecheck
 | Feature                      | Status                                                         |
 |------------------------------|----------------------------------------------------------------|
 | XLM streaming                | ✅ Contract deployed, UI integrated on testnet                 |
-| Scheduled withdrawals        | Planned — automated pull from on-chain stream balance         |
+| Agent autopilot withdrawals  | Planned — automated pull from on-chain stream balance         |
 | Multi-asset support          | Planned — other Stellar assets beyond XLM                     |
 | PDF audit export             | Planned — PDF generation for the compliance page              |
 | `drip-stellar` SDK package   | Planned — lightweight TypeScript client on npm                |
