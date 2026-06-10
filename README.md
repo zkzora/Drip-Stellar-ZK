@@ -126,53 +126,6 @@ See [DEMO.md](DEMO.md) for the full demo script and walkthrough.
 
 ---
 
-## Project Structure
-
-```
-drip/
-├── app/                    # Next.js app router
-│   ├── page.tsx            # Landing page entry
-│   ├── layout.tsx          # Root layout
-│   ├── globals.css         # Global styles
-│   ├── dashboard/          # Dashboard page
-│   ├── docs/               # Documentation pages
-│   ├── faq/                # FAQ page
-│   ├── compliance/         # Compliance reporting
-│   └── api/                # API routes
-├── components/             # React components
-│   ├── landing/            # Landing page components
-│   ├── dashboard/          # DashboardApp, stream cards, etc.
-│   ├── streams/            # StellarStreamPanel, chain selector
-│   ├── docs/               # Documentation renderer
-│   ├── compliance/         # Compliance & CSV export
-│   ├── providers/          # AppProviders
-│   ├── faq/                # FAQ components
-│   └── ui/                 # Reusable UI primitives
-├── lib/                    # Utilities and helpers
-│   ├── stellar/            # Freighter hook, Soroban transactions, stream hook
-│   │   ├── registry.ts
-│   │   ├── transactions.ts
-│   │   ├── useFreighterWallet.ts
-│   │   ├── useStellarStreams.ts
-│   │   └── wallet.ts
-│   ├── adapters/           # Chain-agnostic access adapter
-│   │   ├── index.ts
-│   │   ├── stellar.ts
-│   │   └── types.ts
-│   ├── supabase/           # Supabase client (server)
-│   ├── compliance/         # Compliance data utilities
-│   ├── docs-content.ts     # Documentation content
-│   ├── format.ts           # Number/time formatting helpers
-│   ├── mock-data.ts        # Mock stream data for demo/dev
-│   ├── rates.ts            # Flow rate calculations
-│   └── types.ts            # Shared TypeScript types
-├── stellar/                # Soroban contract workspace
-│   └── contracts/drip_stream/src/lib.rs
-└── public/                 # Static assets
-```
-
----
-
 ## Testing
 
 ```bash
