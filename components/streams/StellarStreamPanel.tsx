@@ -1017,13 +1017,14 @@ function StellarTrackedStreamCard({
         }
       />
       {onRemove && (
-        <button
-          onClick={() => onRemove(stream.streamId)}
-          className="absolute top-3 right-11 opacity-0 group-hover:opacity-100 transition text-white/20 hover:text-white/60"
-          title="Remove from local list"
-        >
-          <Icon name="x" size={11} />
-        </button>
+        <div className="mt-3 pt-3 border-t border-white/5 flex justify-end opacity-0 group-hover:opacity-100 transition">
+          <button
+            onClick={() => onRemove(stream.streamId)}
+            className="flex items-center gap-1 text-[10.5px] text-white/25 hover:text-rose-300 transition"
+          >
+            <Icon name="trash-2" size={11} /> Remove from list
+          </button>
+        </div>
       )}
     </div>
   );
