@@ -17,6 +17,9 @@ import {
   type StreamState as StellarStreamState,
 } from "@/lib/stellar/transactions";
 import type { UseStellarStreamsReturn, TrackedStream } from "@/lib/stellar/useStellarStreams";
+import { PrivateStreamModal } from "@/components/streams/PrivateStreamModal";
+import { GenerateProofButton } from "@/components/streams/GenerateProofButton";
+import { getCommitment, isZkConfigured } from "@/lib/stellar/zkVerifier";
 
 // =========================================================================
 // HELPERS (top-level so sub-components can use them)
@@ -114,6 +117,8 @@ function StellarStreamCard({
   onSign,
   onReset,
   actionEnabled,
+  isPrivate = false,
+  proofButton = null,
 }: {
   stream: StellarStreamState;
   streamId: string;
@@ -128,6 +133,8 @@ function StellarStreamCard({
   onSign: () => void;
   onReset: () => void;
   actionEnabled: (action: "pause" | "resume" | "withdraw" | "cancel") => boolean;
+  isPrivate?: boolean;
+  proofButton?: React.ReactNode;
 }) {
   const isActive = stream.status === "Active";
   const isBusy = txPhase === "building" || txPhase === "signing" || txPhase === "submitting";
@@ -165,7 +172,14 @@ function StellarStreamCard({
             <div className="text-[11px] font-mono text-white/40 truncate">XLM Stream · Stellar Testnet</div>
           </div>
         </div>
-        <StellarStatusPill status={stream.status} />
+        <div className="flex items-center gap-1.5">
+          {isPrivate && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-violet-400/30 text-violet-200 bg-violet-400/10 text-[10px] font-mono uppercase tracking-[0.16em]">
+              <Icon name="lock" size={10} /> Private
+            </span>
+          )}
+          <StellarStatusPill status={stream.status} />
+        </div>
       </div>
 
       {/* ── Withdrawn amount — DRIP large number ── */}
@@ -179,14 +193,19 @@ function StellarStreamCard({
           <span className="text-sky-300/70 text-[14px] font-num leading-none tracking-[-0.02em]">{fastDec}</span>
         </div>
         <div className="text-[11px] text-white/40 font-mono mt-1.5">
-          total {stroopsToXlmStr(stream.amount)} · stream #{streamId}
+          {isPrivate ? (
+            <span className="text-violet-200/70 inline-flex items-center gap-1"><Icon name="shield-check" size={10} className="text-violet-300/70" /> Private Proof Enabled</span>
+          ) : (
+            <>total {stroopsToXlmStr(stream.amount)}</>
+          )}{" "}
+          · stream #{streamId}
         </div>
       </div>
 
       {/* ── Progress bar ── */}
       <div className="mt-4">
         <div className="flex items-center justify-between text-[10.5px] font-mono text-white/45 mb-1.5">
-          <span>{progress.toFixed(1)}% withdrawn of {stroopsToXlmStr(stream.amount)}</span>
+          <span>{progress.toFixed(1)}% withdrawn{isPrivate ? "" : ` of ${stroopsToXlmStr(stream.amount)}`}</span>
         </div>
         <div className="h-1.5 rounded-full bg-white/5 overflow-hidden relative">
           <div
@@ -290,6 +309,8 @@ function StellarStreamCard({
           {shortAddr(stream.receiver)}
         </div>
         <div className="flex items-center gap-1 shrink-0">
+          {/* Income proof — only for private streams */}
+          {proofButton}
           {/* Pause — only when Active */}
           {actionEnabled("pause") && (
             <button
@@ -424,6 +445,7 @@ function StellarNewStreamDrawer({
   createReceiver, setCreateReceiver,
   createAmount,   setCreateAmount,
   createDurationHours, setCreateDurationHours,
+  privateMode, setPrivateMode,
   createFormValid,
   amountStroops,
   durationValid,
@@ -442,6 +464,7 @@ function StellarNewStreamDrawer({
   createReceiver: string; setCreateReceiver: (v: string) => void;
   createAmount: string;   setCreateAmount: (v: string) => void;
   createDurationHours: string; setCreateDurationHours: (v: string) => void;
+  privateMode: boolean; setPrivateMode: (v: boolean) => void;
   createFormValid: boolean;
   amountStroops: bigint | null;
   durationValid: boolean;
@@ -671,6 +694,50 @@ function StellarNewStreamDrawer({
                   )}
                 </div>
 
+                {/* Private Mode toggle (Drip Private) */}
+                <button
+                  type="button"
+                  onClick={() => setPrivateMode(!privateMode)}
+                  className={`w-full rounded-xl border p-3.5 flex items-center gap-3 text-left transition ${
+                    privateMode
+                      ? "border-violet-400/35 bg-violet-500/[0.06]"
+                      : "border-white/8 bg-white/[0.02] hover:border-white/15"
+                  }`}
+                >
+                  <span
+                    className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 border ${
+                      privateMode
+                        ? "bg-violet-500/20 border-violet-400/40 text-violet-200"
+                        : "bg-white/5 border-white/10 text-white/40"
+                    }`}
+                  >
+                    <Icon name="lock" size={15} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2">
+                      <span className="text-[13px] text-white">Private Mode</span>
+                      <span className="text-[9.5px] font-mono uppercase tracking-[0.16em] text-violet-300/70">
+                        Drip Private
+                      </span>
+                    </span>
+                    <span className="block text-[11px] text-white/45 mt-0.5">
+                      Hide the amount on-chain with a ZK commitment. After creating, you&apos;ll register the
+                      commitment and save a salt for income proofs.
+                    </span>
+                  </span>
+                  <span
+                    className={`relative w-9 h-5 rounded-full shrink-0 transition ${
+                      privateMode ? "bg-violet-500/60" : "bg-white/10"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${
+                        privateMode ? "left-[1.15rem]" : "left-0.5"
+                      }`}
+                    />
+                  </span>
+                </button>
+
                 {/* Safety note */}
                 <div className="rounded-xl border border-sky-400/15 bg-sky-400/[0.03] p-3.5 text-[11.5px] font-mono text-white/40 leading-relaxed">
                   Testnet only · native XLM · Freighter signature required · no private keys stored · chain-isolated from Solana
@@ -759,10 +826,42 @@ function StellarTrackedStreamCard({
   const [txResult, setTxResult] = useState<{ txHash?: string; returnValue?: unknown } | null>(null);
   // Local mirror of on-chain state — refreshed after each tx
   const [localState, setLocalState] = useState<StellarStreamState | null>(stream.onChainState);
+  // Whether this stream has a registered ZK commitment (Drip Private).
+  const [isPrivate, setIsPrivate] = useState(false);
+  // Whether we arrived via a shared proof link targeting this stream — if so we
+  // auto-open the proof drawer once we know the stream is private.
+  const [proofLinkMatch, setProofLinkMatch] = useState(false);
 
   useEffect(() => {
     setLocalState(stream.onChainState);
   }, [stream.onChainState]);
+
+  // Detect a shared proof link (?proof_stream=<id>) on mount.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("proof_stream") === stream.streamId) setProofLinkMatch(true);
+    } catch {
+      /* URL access failed — ignore */
+    }
+  }, [stream.streamId]);
+
+  // Detect a registered commitment to show the Private badge + proof button.
+  useEffect(() => {
+    let cancelled = false;
+    if (!isZkConfigured() || !freighter.address) return;
+    (async () => {
+      const r = await getCommitment({
+        sourceAddress: freighter.address!,
+        streamId: BigInt(stream.streamId),
+      });
+      if (!cancelled && r.ok) setIsPrivate(!!r.commitmentHex);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [freighter.address, stream.streamId]);
 
   const resetTx = useCallback(() => {
     setTxPhase("idle");
@@ -896,6 +995,21 @@ function StellarTrackedStreamCard({
         onSign={handleSign}
         onReset={resetTx}
         actionEnabled={actionEnabled}
+        isPrivate={isPrivate}
+        proofButton={
+          isPrivate ? (
+            <GenerateProofButton
+              streamId={stream.streamId}
+              sourceAddress={freighter.address ?? null}
+              defaultAmountXlm={(() => {
+                const stroops = localState?.amount ?? stream.amountStroops;
+                return stroops ? (Number(BigInt(stroops)) / 10_000_000).toString() : undefined;
+              })()}
+              autoOpen={proofLinkMatch && isPrivate}
+              compact
+            />
+          ) : null
+        }
       />
       {onRemove && (
         <button
@@ -934,6 +1048,12 @@ export function StellarStreamPanel({
 
   // ── Drawer ───────────────────────────────────────────────────────────────
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // ── Drip Private ───────────────────────────────────────────────────────────
+  const [privateMode, setPrivateMode] = useState(false);
+  const [privateModal, setPrivateModal] = useState<{ streamId: string; amountStroops: bigint } | null>(
+    null,
+  );
 
   // ── Create stream form ───────────────────────────────────────────────────
   const [createReceiver,      setCreateReceiver]      = useState("");
@@ -1037,6 +1157,10 @@ export function StellarStreamPanel({
           lastKnownStatus: "Active",
           lastLoadedAt: new Date().toISOString(),
         });
+        // Drip Private: after creation, open the commitment-registration modal.
+        if (privateMode) {
+          setPrivateModal({ streamId: rawId, amountStroops: BigInt(pendingStroopsRef.current) });
+        }
       }
     }
 
@@ -1049,7 +1173,7 @@ export function StellarStreamPanel({
         } catch { /* ignore */ }
       }, 3500);
     }
-  }, [pendingXdr, freighter.networkPassphrase, previewInfo, freighter.address, stellarStreams, manageId, manageIdValid]);
+  }, [pendingXdr, freighter.networkPassphrase, previewInfo, freighter.address, stellarStreams, manageId, manageIdValid, privateMode]);
 
   const handleCreateStream = useCallback(async () => {
     if (!freighter.address || !amountStroops) return;
@@ -1281,7 +1405,16 @@ export function StellarStreamPanel({
                 )}
               </div>
               <div className="flex items-center gap-2">
-                {stellarStreams && !stellarStreams.loading && (
+                {stellarStreams && !stellarStreams.loading && !stellarStreams.discovering && (
+                  <button
+                    onClick={() => void stellarStreams.discover()}
+                    className="text-[11px] font-mono text-white/30 hover:text-violet-300 flex items-center gap-1 transition"
+                    title="Scan chain for all streams involving your wallet"
+                  >
+                    <Icon name="search" size={11} /> Scan
+                  </button>
+                )}
+                {stellarStreams && !stellarStreams.loading && !stellarStreams.discovering && (
                   <button
                     onClick={() => void stellarStreams.refresh()}
                     className="text-[11px] font-mono text-white/30 hover:text-white/60 flex items-center gap-1 transition"
@@ -1302,8 +1435,16 @@ export function StellarStreamPanel({
               </div>
             </div>
 
+            {/* Discovery state */}
+            {stellarStreams?.discovering && (
+              <div className="flex items-center gap-2 text-[12px] text-white/45 font-mono px-1">
+                <span className="inline-block w-3 h-3 rounded-full border-2 border-violet-300 border-t-transparent animate-spin" />
+                Scanning chain for your streams…
+              </div>
+            )}
+
             {/* Loading state */}
-            {stellarStreams?.loading && (
+            {stellarStreams?.loading && !stellarStreams.discovering && (
               <div className="flex items-center gap-2 text-[12px] text-white/45 font-mono px-1">
                 <span className="inline-block w-3 h-3 rounded-full border-2 border-sky-300 border-t-transparent animate-spin" />
                 Loading stream states…
@@ -1325,18 +1466,26 @@ export function StellarStreamPanel({
             )}
 
             {/* Empty state — no tracked streams */}
-            {stellarStreams && !stellarStreams.loading && stellarStreams.streams.length === 0 && (
+            {stellarStreams && !stellarStreams.loading && !stellarStreams.discovering && stellarStreams.streams.length === 0 && (
               <div className="rounded-2xl glass p-8 text-center space-y-2">
-                <div className="text-[14px] text-white/50">No Stellar streams tracked yet.</div>
+                <div className="text-[14px] text-white/50">No streams found for this wallet.</div>
                 <div className="text-[12px] font-mono text-white/30">
-                  Create a new XLM stream or load an existing stream ID to get started.
+                  Create a new XLM stream, or scan the chain to find streams sent to you.
                 </div>
-                <button
-                  onClick={() => { resetTx(); setDrawerOpen(true); }}
-                  className="mt-3 btn-primary rounded-full px-4 py-2 text-[12.5px] font-medium text-white inline-flex items-center gap-1.5"
-                >
-                  <Icon name="plus" size={12} /> New XLM stream
-                </button>
+                <div className="flex items-center justify-center gap-2 mt-3">
+                  <button
+                    onClick={() => { resetTx(); setDrawerOpen(true); }}
+                    className="btn-primary rounded-full px-4 py-2 text-[12.5px] font-medium text-white inline-flex items-center gap-1.5"
+                  >
+                    <Icon name="plus" size={12} /> New stream
+                  </button>
+                  <button
+                    onClick={() => void stellarStreams.discover()}
+                    className="rounded-full px-4 py-2 text-[12.5px] font-medium border border-white/10 text-white/60 hover:text-white hover:border-white/30 transition inline-flex items-center gap-1.5"
+                  >
+                    <Icon name="search" size={12} /> Scan for streams
+                  </button>
+                </div>
               </div>
             )}
 
@@ -1390,6 +1539,8 @@ export function StellarStreamPanel({
           setCreateAmount={setCreateAmount}
           createDurationHours={createDurationHours}
           setCreateDurationHours={setCreateDurationHours}
+          privateMode={privateMode}
+          setPrivateMode={setPrivateMode}
           createFormValid={createFormValid}
           amountStroops={amountStroops}
           durationValid={durationValid}
@@ -1401,6 +1552,20 @@ export function StellarStreamPanel({
           onPreview={handleCreateStream}
           onSign={handleSign}
           onReset={resetTx}
+        />
+      )}
+
+      {/* ── Drip Private: register commitment after a private stream is created ── */}
+      {privateModal && freighter.address && (
+        <PrivateStreamModal
+          streamId={privateModal.streamId}
+          payerAddress={freighter.address}
+          amountStroops={privateModal.amountStroops}
+          freighter={freighter}
+          onClose={() => setPrivateModal(null)}
+          onRegistered={() => {
+            void stellarStreams?.refresh();
+          }}
         />
       )}
     </div>

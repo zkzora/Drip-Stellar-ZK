@@ -1,0 +1,7 @@
+# Sample witness for generating a demo proof.
+# amount/salt are PRIVATE; commitment/threshold are PUBLIC.
+# commitment = pedersen_hash([amount, salt]) for amount=5000, salt=123456789.
+amount = "5000"
+salt = "123456789"
+commitment = "2067105264485483295509837104634970037450379162239410087988243794742194756821"
+threshold = "1000"

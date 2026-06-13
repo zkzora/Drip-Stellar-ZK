@@ -12,6 +12,7 @@ import {
   nativeToScVal,
   scValToNative,
 } from "@stellar/stellar-sdk";
+import { upsertStreamRecord, type StellarStreamRecord } from "./registry";
 
 const CONTRACT_ID = process.env.NEXT_PUBLIC_STELLAR_CONTRACT_ID ?? "";
 const RPC_URL = process.env.NEXT_PUBLIC_STELLAR_RPC_URL ?? "";
@@ -328,6 +329,81 @@ export async function getStreamState(streamId: bigint): Promise<StreamStateResul
     }
     return { ok: false, error: msg.slice(0, 200) };
   }
+}
+
+// ── Auto-discovery ────────────────────────────────────────────────────────────
+
+/**
+ * Read the total number of streams ever created from the contract's instance
+ * storage (DataKey::StreamCount). Single RPC call, no signing required.
+ */
+export async function getStreamCount(): Promise<number> {
+  if (!isConfigured()) return 0;
+  try {
+    const server = getServer();
+    const entry = await server.getContractData(
+      CONTRACT_ID,
+      xdr.ScVal.scvLedgerKeyContractInstance(),
+      rpc.Durability.Persistent,
+    );
+    const storage = entry.val.contractData().val().instance().storage();
+    if (!storage) return 0;
+    for (const item of storage) {
+      const k = scValToNative(item.key());
+      // DataKey::StreamCount serializes as ["StreamCount"] (unit enum variant)
+      const isStreamCount =
+        k === "StreamCount" ||
+        (Array.isArray(k) && k[0] === "StreamCount");
+      if (isStreamCount) {
+        return Number(scValToNative(item.val()));
+      }
+    }
+    return 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Scan all on-chain streams and return those where the wallet is payer or
+ * receiver. Fetches in batches of 10 parallel RPC calls.
+ * onProgress(found, scanned, total) fires after each batch.
+ */
+export async function discoverStreamsForWallet(
+  walletAddress: string,
+  onProgress?: (found: number, scanned: number, total: number) => void,
+): Promise<StellarStreamRecord[]> {
+  const count = await getStreamCount();
+  if (count === 0) return [];
+
+  const found: StellarStreamRecord[] = [];
+  const BATCH = 10;
+
+  for (let i = 1; i <= count; i += BATCH) {
+    const ids = Array.from(
+      { length: Math.min(BATCH, count - i + 1) },
+      (_, j) => BigInt(i + j),
+    );
+    const results = await Promise.all(ids.map((id) => getStreamState(id)));
+    for (const result of results) {
+      if (result.ok && result.stream) {
+        const s = result.stream;
+        if (s.payer === walletAddress || s.receiver === walletAddress) {
+          found.push({
+            streamId: s.streamId,
+            payer: s.payer,
+            receiver: s.receiver,
+            amountStroops: s.amount,
+            lastKnownStatus: s.status,
+            lastLoadedAt: new Date().toISOString(),
+          });
+        }
+      }
+    }
+    onProgress?.(found.length, Math.min(i + BATCH - 1, count), count);
+  }
+
+  return found;
 }
 
 // ── Stellar history helpers ───────────────────────────────────────────────────

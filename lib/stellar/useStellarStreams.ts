@@ -8,7 +8,7 @@ import {
   clearRegistryForWallet,
   type StellarStreamRecord,
 } from "./registry";
-import { getStreamState, type StreamState } from "./transactions";
+import { getStreamState, discoverStreamsForWallet, type StreamState } from "./transactions";
 
 export type TrackedStream = StellarStreamRecord & {
   onChainState: StreamState | null;
@@ -19,7 +19,9 @@ export type TrackedStream = StellarStreamRecord & {
 export type UseStellarStreamsReturn = {
   streams: TrackedStream[];
   loading: boolean;
+  discovering: boolean;
   refresh: () => Promise<void>;
+  discover: () => Promise<void>;
   addStream: (record: StellarStreamRecord) => void;
   removeStream: (streamId: string) => void;
   clearAll: () => void;
@@ -30,7 +32,9 @@ export function useStellarStreams(walletAddress: string | null): UseStellarStrea
   const [recordCount, setRecordCount] = useState(0);
   const [streams, setStreams] = useState<TrackedStream[]>([]);
   const [loading, setLoading] = useState(false);
+  const [discovering, setDiscovering] = useState(false);
   const fetchingRef = useRef(false);
+  const discoveringRef = useRef(false);
 
   // Sync count from storage on wallet change
   useEffect(() => {
@@ -93,6 +97,30 @@ export function useStellarStreams(walletAddress: string | null): UseStellarStrea
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recordCount, walletAddress]);
 
+  // Auto-discover all on-chain streams for this wallet (payer + receiver).
+  // Runs once on wallet connect; merges found streams into the registry.
+  const discover = useCallback(async () => {
+    if (!walletAddress || discoveringRef.current) return;
+    discoveringRef.current = true;
+    setDiscovering(true);
+    try {
+      const found = await discoverStreamsForWallet(walletAddress);
+      if (found.length > 0) {
+        found.forEach((r) => upsertStreamRecord(walletAddress, r));
+        setRecordCount(loadRegistry(walletAddress).length);
+      }
+    } finally {
+      discoveringRef.current = false;
+      setDiscovering(false);
+    }
+  }, [walletAddress]);
+
+  // Run discovery once when wallet connects.
+  useEffect(() => {
+    if (walletAddress) void discover();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [walletAddress]);
+
   const addStream = useCallback(
     (record: StellarStreamRecord) => {
       if (!walletAddress) return;
@@ -121,7 +149,9 @@ export function useStellarStreams(walletAddress: string | null): UseStellarStrea
   return {
     streams,
     loading,
+    discovering,
     refresh,
+    discover,
     addStream,
     removeStream,
     clearAll,

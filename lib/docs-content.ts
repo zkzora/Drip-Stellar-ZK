@@ -149,6 +149,10 @@ export const DOCS_PAGES: DocPage[] = [
               title: "Service or app",
               body: "An app or service can read Soroban stream state and allow access only while a valid stream remains active.",
             },
+            {
+              title: "Verifier (Drip Private)",
+              body: "A third party can request an income proof. The receiver proves they earn at least X XLM per month — without revealing the exact amount — using zero-knowledge proofs verified on Stellar.",
+            },
           ],
         },
         {
@@ -295,6 +299,97 @@ export const DOCS_PAGES: DocPage[] = [
     },
   },
 
+  // ─── Drip Private (ZK) ──────────────────────────────────────────────────────
+  {
+    slug: "drip-private",
+    href: "/docs/drip-private",
+    title: "Drip Private",
+    navTitle: "Drip Private (ZK)",
+    description: "Zero-knowledge income proofs on Stellar — prove your earnings are above a threshold without revealing the exact amount.",
+    eyebrow: "Zero-Knowledge",
+    icon: "lock",
+    lead: "Drip Private lets a stream receiver prove they earn at least X XLM per month — without revealing the exact stream amount. The proof is generated locally in the browser and verified on-chain by a Soroban smart contract using Stellar's native BN254 host functions.",
+    sections: [
+      {
+        type: "text",
+        title: "What it proves",
+        body: [
+          "A Drip Private income proof answers one question: does this stream pay at least [threshold] XLM per month? The answer is yes or no — verified on-chain. The exact amount is never revealed.",
+          "This is useful for employment verification, loan applications, proof of income for services, or any situation where someone needs to prove a minimum earning without exposing private financial data.",
+        ],
+      },
+      {
+        type: "steps",
+        title: "How it works",
+        steps: [
+          {
+            title: "Payer toggles Private Mode",
+            body: "When creating a stream, the payer turns on Private Mode. After the stream is created, the Drip Private modal generates a random salt and computes a Pedersen commitment: pedersen_hash(amount, salt).",
+          },
+          {
+            title: "Commitment is registered on-chain",
+            body: "The payer signs a register_commitment transaction through Freighter. The commitment (a 32-byte hash) is stored in the drip_zk_verifier Soroban contract. The stream amount is never stored in the verifier — only the hash.",
+          },
+          {
+            title: "Payer shares a proof link",
+            body: "After registering, the payer clicks Copy Proof Link. This URL encodes the stream ID and salt. The payer sends it to the receiver via any channel — no manual salt copy-paste needed.",
+          },
+          {
+            title: "Receiver opens the link",
+            body: "The receiver opens the link in their browser. The dashboard auto-opens the proof drawer with the stream amount and salt already filled in. The receiver only needs to enter the threshold they want to prove.",
+          },
+          {
+            title: "Proof is generated locally",
+            body: "Clicking Generate Proof runs Noir.js and Barretenberg (bb.js) locally in the browser. No data leaves the device. The proof takes approximately 5–10 seconds and is 14592 bytes.",
+          },
+          {
+            title: "Proof is verified on Stellar",
+            body: "Clicking Verify on Stellar submits the proof to the drip_zk_verifier contract. The contract uses Stellar's BN254 host functions to verify the UltraHonk proof on-chain. It returns true if and only if the proof is valid.",
+          },
+        ],
+      },
+      {
+        type: "cards",
+        title: "Key properties",
+        cards: [
+          {
+            title: "Zero-knowledge",
+            body: "The proof reveals nothing about the stream amount beyond the fact that it meets or exceeds the threshold. The exact number stays private.",
+          },
+          {
+            title: "On-chain verification",
+            body: "Verification happens inside a Soroban contract using Stellar Protocol 23 BN254 host functions. No off-chain oracle or trusted party is involved.",
+          },
+          {
+            title: "Local proof generation",
+            body: "The Noir circuit runs entirely in the browser via Barretenberg (bb.js). The private inputs (amount, salt) never leave the receiver's device.",
+          },
+          {
+            title: "Selective disclosure",
+            body: "The receiver chooses what threshold to prove, to whom, and when. The same stream can generate different proofs for different verifiers.",
+          },
+        ],
+      },
+      {
+        type: "reference",
+        title: "Verifier contract API",
+        intro: "Deployed at CCUOR6VPMCFDOU7MODZGOI2K264YR3LNRSQ4LMJ37LGTZCTOAHSXWNV5 on Stellar Testnet.",
+        items: [
+          { label: "register_commitment", meta: "payer", body: "Stores the Pedersen commitment for a stream. Verifies caller is the stream payer via cross-contract read." },
+          { label: "verify_income_proof", meta: "read-only", body: "Verifies a 14592-byte UltraHonk proof against the registered commitment and threshold. Returns true or false." },
+          { label: "has_commitment",      meta: "read-only", body: "Returns whether a commitment exists for a stream. Drives the Private badge in the dashboard." },
+          { label: "get_commitment",      meta: "read-only", body: "Returns the 32-byte registered commitment for a given stream ID." },
+        ],
+      },
+      {
+        type: "note",
+        title: "Honest limitations",
+        body: "The drip_stream contract stores the stream amount in cleartext — Drip Private adds the ZK layer on top of it. The proof hides the amount from third-party verifiers, but the payer and receiver can still see it on-chain. Full end-to-end confidentiality would require a streaming contract that never stores the cleartext amount.",
+        tone: "warning",
+      },
+    ],
+  },
+
   // ─── Use cases ───────────────────────────────────────────────────────────────
   {
     slug: "use-cases",
@@ -426,6 +521,8 @@ export const DOCS_PAGES: DocPage[] = [
             { title: "Pause or resume",          body: "Payers can pause a stream to stop ongoing vesting. Resuming makes the stream active again. Both actions require a Freighter signature." },
             { title: "Withdraw vested XLM",      body: "Receivers can withdraw the amount that has vested. The dashboard shows available XLM before presenting the Freighter prompt." },
             { title: "Cancel the stream",        body: "Payers can cancel a stream. Vested XLM remains claimable by the receiver, and unvested XLM returns to the payer." },
+            { title: "Private Mode (Drip Private)", body: "Toggle Private Mode when creating a stream to register a zero-knowledge commitment. After creation, copy the proof link and share it with the receiver so they can generate income proofs without manual salt sharing." },
+            { title: "Generate an income proof",    body: "Receivers open the proof drawer, enter a threshold, and click Generate Proof. Noir.js runs locally in the browser (~5–10s). Click Verify on Stellar to submit the proof to the Soroban verifier contract." },
           ],
         },
         {
@@ -616,6 +713,11 @@ export const DOCS_PAGES: DocPage[] = [
             { question: "Where can I verify transactions?",         answer: "Every transaction hash links to Stellar Expert testnet explorer. You can verify any create, pause, resume, withdraw, or cancel transaction there." },
             { question: "What assets are supported?",               answer: "Native XLM only on this Testnet deployment. No other tokens are supported." },
             { question: "Is this a public mainnet launch?",         answer: "No. This is a Stellar Testnet deployment for testing and development. No real funds are involved." },
+            { question: "What is Drip Private?",                    answer: "Drip Private is an optional ZK layer on top of a stream. The payer registers a cryptographic commitment on-chain. The receiver can then prove their income is above a threshold to any verifier — without revealing the exact amount." },
+            { question: "What is a threshold?",                     answer: "The threshold is the minimum amount you want to prove. For example, setting 100 XLM proves to a verifier that your stream pays at least 100 XLM per month — without revealing whether it pays 110 or 500." },
+            { question: "Do I need to share my stream amount?",     answer: "No. The proof link encodes the salt, not the stream amount. The amount is filled automatically from on-chain data. The verifier only learns whether your stream meets the threshold." },
+            { question: "What is a proof link?",                    answer: "After registering a commitment, the payer copies a URL containing the stream ID and salt. The receiver opens it and the proof form auto-fills — no manual copy-paste needed." },
+            { question: "Is the proof generated on Stellar?",       answer: "The proof is generated locally in the browser using Noir.js and Barretenberg. Verification happens on Stellar — the drip_zk_verifier Soroban contract uses BN254 host functions to check the proof on-chain." },
           ],
         },
       ],

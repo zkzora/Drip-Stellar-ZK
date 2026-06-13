@@ -1,0 +1,124 @@
+{
+  "generators": {
+    "address": 3,
+    "nonce": 0,
+    "mux_id": 0
+  },
+  "auth": [
+    [],
+    [],
+    [],
+    [],
+    []
+  ],
+  "ledger": {
+    "protocol_version": 26,
+    "sequence_number": 0,
+    "timestamp": 0,
+    "network_id": "0000000000000000000000000000000000000000000000000000000000000000",
+    "base_reserve": 0,
+    "min_persistent_entry_ttl": 4096,
+    "min_temp_entry_ttl": 16,
+    "max_entry_ttl": 6312000,
+    "ledger_entries": [
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+              "key": "ledger_key_contract_instance",
+              "durability": "persistent",
+              "val": {
+                "contract_instance": {
+                  "executable": {
+                    "wasm": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                  },
+                  "storage": null
+                }
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 4095
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
+              "key": "ledger_key_contract_instance",
+              "durability": "persistent",
+              "val": {
+                "contract_instance": {
+                  "executable": {
+                    "wasm": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                  },
+                  "storage": [
+                    {
+                      "key": {
+                        "vec": [
+                          {
+                            "symbol": "Admin"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
+                            "symbol": "StreamContract"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
+                            "symbol": "Vk"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "bytes": "0000000000008000000000000000000f00000000000000120000000000000001051874148ddf49b3c8188dc53b5d43f98c9442d26987bee9887deae95494ffa308540e3c12b1aab8b9459873d464b1c574972f733b21f08dbe74bcf1d58bf40f08352755ff30a49aaa40a625ccfd62286a2c623aa6ad9356f913c32797d95f5d273ea911e4a56286f5821662b54875eb5228e57b47a742b4dd0b753be08366a51356ee95f5f2aadcb02984a93dbcba4f8966515223ec4b47fbf62c1fa19b95b402f830c501d0d67612eb81f5165dc2c677e1555e502213a8d10ff4ecbf85e3580bf58b5a97987dba25279f15bd6b15baf6c5d8b9d75d43cf283acb8f47e62b6d1684671358c0dcee1f071a23453a7110a27a49950076de20c6f9f6e8e96a815625830e3779d04d4636da8199efc73078ca030d558286d6d0a78d0dcc2c7155741ed82419f377786a1d8561eb55b9da1abcc3b6c6b032662933286757a0d96f2b05699b5709e76fcc019f97d1ef7e302661b7d9f8001eea5869263660b6e0b3c92ecb652a9effc028211a3e251daec1f420721edf65cb6225489049d112afd2b01bb6505182acb9e745bf1f6bd37fcd20077f23af8c8b7a28c0c3b562fb78102a0e17916812460eb26f77481d4a3910dae7dbee64bcf43a448a0f8f3c5a050f67106700ec819c98d2b1236a870f530272964a06a714cca12bca20cddbc7777ef419f7dba4a2ec4102a79702351f2408dc87f2df2713d4e91d3d0a43700424781301a02d4eaa91719d0f7302bfb7f40dc0f2b130a98f452ebf81233ad86ecb65b22de61835fad689095cd4fee5fd7fdda9e0fadb0e67df1d85f3c1b62d6e6808bf0dc00510da88b7f16c7d55ad8d4b0dd62acc0a5fbe90b30d088c6e48bc2c21fb1ae81e5f1164731abdaea8ba17f5b5b195f71f387be97727a659896d10f889792871c071cac134a44c07b04ac4f259e13539c18343f866765ab6ce606c540d53148fbb14b3d2f01a236c2cb00f95ec892af60c692a1c16b9a9f45e5cd4772e542112872bb23307aada70a61e3a9fdd3b2a45c4fa6ef190b7504b20ba0135b3dc2f543408b9414555cd62f1350cf08c729c32c60cdce30224b84b426ca158b0301077ee02e0cb2b65ae4156851f974d215100a02d2761161f54ea72c58f39caab2ea205c1a13f305a0376034f6e5b9545c6580d1bc92b2c70fbf4c9507725b5e20f0d922a110df03cda3183f4f696ce26d6f13886c07f5c6e9aef49794a18478706096f92f4677dd5bc3ab383213b722d64cab33c4ab30c9adf88231943ee5afb12467b6e75753a307acafb09b623221ad42aab8ef6fdfb36a07b56d3035239011485f33c77b62757476107b6bf6008b88b196c2c562068096ba2acab572445b306a691b70340e97ece7ed73e255938d28a4f81c4214dadaf6e044ff65c86f9401a924f647e534c1bd9c37dd135d6462112b7ea62dc8def20db203032bc8df0331ef655b19e9880347f86ae6aee088cf5a6d8ff217579244806975dcac67d85c81db33455acf16762d55ebe69a376c16bd0686143c94fe5c21c9ad22186454de21891b0842dd870b59cb0cbb90d0af0b307e91cdf74497da95c5850930b49376d0cda10b0e42d9ecb844f5c68f9a662c6509880b12c997833f0175ec82dc98c7502db7478c2824ee0bdbfe6ecf45a05fb1c727bb2c16672907dfd9d3d16dcb7731154063700c31dc55c9c87426627e1108fd3ced16cc753706f37175ddc37440523bee66175d96a7fde82490114fdc45fb16d2cfb16222349e0ea104235a56a192eac1548edb30ba9ff93d8892a7c4f370141ba326bd927be87dbc545d3d2f37a1a0b1f7471867062abd538da6f63b8f7a925b156b5e3dd31d7214806ef35434a1f88616da854af8e9703ab2aee814a570e408ab6f0332a4744733da91a010e131e3ebdcc6f4559ee2e59f262d699b47ebbae4769fa609fcd9afac8189b4fa1a01ca3b0f3ed290a75772942585e0b5f51a8dc3d3bfa482abc281f9f52ab5bf3dc1cd39d62b60ee7007bc1d2a9226d0f2e7d8fab2a2c03109674effc77c6e1960f2f761f3e94efbec3a10d965f8345c6e7b8ff508e719ea9d9bd7c87fc34e95f672afc6b96b2bc3d9bc67a895120c2d0c7dfa040a72305013744de404492eece80023876c75a0ba22e4ee8b222a11bc51e8773b9f5b64d3626237b70fd96ec2b7b1e6617432df9aa46cbe8e201d4ac3f8d80323952e2359b3696f87873e7fced112ac48a055510513c7b657798fb6a076c5776a01958590e4a506003a7bac1d5560000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000223d483852ad4cd53105e48e4a5144e672392fd29b575af015f08dd8cfccf53751aca495ed19cedb2dec7646aa153395961a65baabaa8350718b955189a38d01e"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 4095
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_code": {
+              "ext": "v0",
+              "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "code": ""
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 4095
+      }
+    ]
+  },
+  "events": []
+}

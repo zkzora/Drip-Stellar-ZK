@@ -1,6 +1,9 @@
 [workspace]
-members = ["contracts/drip_stream"]
+members = ["contracts/drip_stream", "contracts/drip_zk_verifier"]
 resolver = "2"
+# The vendored UltraHonk verifier crate (crates/ultrahonk-soroban-verifier) is
+# pulled in as a path dependency of drip_zk_verifier rather than a workspace
+# member, so its upstream test suite isn't built here.
 
 # Soroban-recommended release profile for optimised wasm output.
 [profile.release]

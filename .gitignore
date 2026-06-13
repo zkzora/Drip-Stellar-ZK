@@ -32,3 +32,5 @@ Thumbs.db
 # AI Artifacts
 CLAUDE.md
 drip_internal_system_plan_md.md
+.agents/
+.claude/

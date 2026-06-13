@@ -1,0 +1,7 @@
+[package]
+name = "drip_income_proof"
+type = "bin"
+authors = ["Drip"]
+compiler_version = ">=0.38.0"
+
+[dependencies]
