@@ -75,16 +75,15 @@ function StellarAvatar({ addr = "x", size = 36 }: { addr?: string; size?: number
 // STELLAR STATUS PILL — matches Solana StatusPill shape
 // =========================================================================
 function StellarStatusPill({ status }: { status: string }) {
-  const map: Record<string, { label: string; c: string; dot: string }> = {
-    Active:    { label: "ACTIVE",    c: "border-emerald-400/30 text-emerald-300 bg-emerald-400/5", dot: "bg-emerald-400 pulse-dot" },
-    Paused:    { label: "PAUSED",    c: "border-amber-400/30  text-amber-300  bg-amber-400/5",    dot: "bg-amber-300" },
-    Cancelled: { label: "CANCELLED", c: "border-white/15      text-white/55   bg-white/5",         dot: "bg-white/40" },
-    Completed: { label: "COMPLETED", c: "border-white/15      text-white/55   bg-white/5",         dot: "bg-white/40" },
+  const map: Record<string, { label: string; c: string }> = {
+    Active:    { label: "ACTIVE",    c: "border-emerald-400/30 text-emerald-300 bg-emerald-400/5" },
+    Paused:    { label: "PAUSED",    c: "border-amber-400/30  text-amber-300  bg-amber-400/5"    },
+    Cancelled: { label: "CANCELLED", c: "border-white/15      text-white/55   bg-white/5"         },
+    Completed: { label: "COMPLETED", c: "border-white/15      text-white/55   bg-white/5"         },
   };
   const m = map[status] ?? map["Active"];
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-mono uppercase tracking-[0.16em] ${m.c}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-mono uppercase tracking-[0.16em] ${m.c}`}>
       {m.label}
     </span>
   );
@@ -174,8 +173,8 @@ function StellarStreamCard({
         </div>
         <div className="flex items-center gap-1.5">
           {isPrivate && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-violet-400/30 text-violet-200 bg-violet-400/10 text-[10px] font-mono uppercase tracking-[0.16em]">
-              <Icon name="lock" size={10} /> Private
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full border border-violet-400/30 text-violet-200 bg-violet-400/10 text-[10px] font-mono uppercase tracking-[0.16em]">
+              Private
             </span>
           )}
           <StellarStatusPill status={stream.status} />
@@ -1022,7 +1021,7 @@ function StellarTrackedStreamCard({
             onClick={() => onRemove(stream.streamId)}
             className="flex items-center gap-1 text-[10.5px] text-white/25 hover:text-rose-300 transition"
           >
-            <Icon name="trash-2" size={11} /> Remove from list
+            Remove from list
           </button>
         </div>
       )}
