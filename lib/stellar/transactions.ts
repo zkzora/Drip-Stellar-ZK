@@ -23,6 +23,7 @@ export const NETWORK_PASSPHRASE = Networks.TESTNET;
 // Use BigInt() not a literal (n suffix) so es2017 target is happy.
 export const STROOPS_PER_XLM = BigInt(10_000_000);
 export const EXPLORER_TX_URL = "https://stellar.expert/explorer/testnet/tx/";
+export const EXPLORER_ACCOUNT_URL = "https://stellar.expert/explorer/testnet/account/";
 
 // ── Result types ──────────────────────────────────────────────────────────────
 

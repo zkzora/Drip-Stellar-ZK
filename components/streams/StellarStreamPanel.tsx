@@ -13,6 +13,7 @@ import {
   submitSignedTx as submitStellarTx,
   getStreamState,
   EXPLORER_TX_URL,
+  EXPLORER_ACCOUNT_URL,
   type BuildResult as StellarBuildResult,
   type StreamState as StellarStreamState,
 } from "@/lib/stellar/transactions";
@@ -356,10 +357,10 @@ function StellarStreamCard({
               <Icon name="x" size={12} />
             </button>
           )}
-          {/* Explorer — always shown if tx hash available, else static link */}
+          {/* Explorer — tx link if available, else payer account */}
           <a
-            href={txResult?.txHash ? `${EXPLORER_TX_URL}${txResult.txHash}` : "#"}
-            target={txResult?.txHash ? "_blank" : undefined}
+            href={txResult?.txHash ? `${EXPLORER_TX_URL}${txResult.txHash}` : `${EXPLORER_ACCOUNT_URL}${stream.payer}`}
+            target="_blank"
             rel="noopener noreferrer"
             title="View on Stellar Explorer"
             className="btn-ghost rounded-md w-8 h-8 flex items-center justify-center text-white/50 hover:text-sky-300"
