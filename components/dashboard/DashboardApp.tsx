@@ -176,7 +176,7 @@ function Sidebar({ active, onChange, streams, stellarStreamCount }: any) {
             className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13.5px] transition ${active === it.k ? "bg-white/[0.04] text-white border border-violet-400/20" : "text-white/55 hover:text-white hover:bg-white/[0.02] border border-transparent"}`}
           >
             {it.imgSrc
-              ? <img src={it.imgSrc} alt="" className={`w-[15px] h-[15px] ${active === it.k ? "opacity-90" : "opacity-40"}`} />
+              ? <img src={it.imgSrc} alt="" className={`w-[15px] h-[15px] object-contain ${active === it.k ? "opacity-90" : "opacity-40"}`} />
               : <Icon name={it.icon} size={15} className={active === it.k ? "text-violet-200" : ""} />
             }
             <span className="flex-1 text-left">{it.label}</span>
