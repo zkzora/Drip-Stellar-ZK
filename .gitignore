@@ -7,6 +7,8 @@ out/
 
 # rust / anchor
 target/
+!drip_proof/target/drip_income_proof.json
+!drip_proof/target/vk
 .anchor/
 test-ledger/
 
