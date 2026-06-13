@@ -122,13 +122,6 @@ export const DRIP_PILLARS = [
 export const STELLAR_DRIP_PILLARS = [
   {
     n: "i",
-    title: "Agent-Native",
-    icon: "bot",
-    body: "Built for programmatic spending and auto-scaling. Agents hire other agents with budget caps, auto-revoke clauses, and per-token metering - no human in the loop.",
-    meta: "Spending policies · Auto-scale · Agent SDK",
-  },
-  {
-    n: "ii",
     title: "Soroban Smart Contracts",
     icon: "gauge",
     body: "Leveraging Stellar's Soroban execution environment for per-second settlement. Streams settle continuously via the Drip contract — trustless, non-custodial.",
@@ -136,7 +129,7 @@ export const STELLAR_DRIP_PILLARS = [
     highlight: true,
   },
   {
-    n: "iii",
+    n: "ii",
     title: "Audit-Ready",
     icon: "file-check-2",
     body: "CSV exports for tax and accounting workflows. Every stream is verifiable on Stellar Expert - accountants get clean ledgers, auditors get cryptographic receipts. PDF export coming soon.",
@@ -354,7 +347,7 @@ export const AGENT_LOG_DEMO = {
 };
 
 export const DASHBOARD_NAV_ITEMS = [
-  { k: "dashboard", icon: "layout-dashboard", label: "Dashboard" },
+  { k: "dashboard", icon: "gauge",            label: "Dashboard" },
   { k: "streams",   icon: "waves",            label: "Streams", hasStreamBadge: true },
   { k: "yield",     icon: "sprout",           label: "Yield" },
   { k: "history",   icon: "scroll-text",      label: "History" },

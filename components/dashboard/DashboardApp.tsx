@@ -601,14 +601,14 @@ function StellarDashboard({ walletConnected, onConnectWallet, onNewStream, onGoT
               onClick={() => onGoTo("streams")}
             />
             <SummaryTile
-              icon="coins"
+              imgSrc="/stellar-logo.png"
               label="Total XLM locked"
               value={totalXlm.toFixed(4)}
               sub="across all tracked streams"
               accent
             />
             <SummaryTile
-              icon="download"
+              imgSrc="/stellar-logo.png"
               label="Withdrawn XLM"
               value={withdrawnXlm.toFixed(4)}
               sub="released to receivers"
@@ -855,12 +855,12 @@ function DashboardPage({ streams, onNewStream, onGoTo, walletConnected, walletEr
   );
 }
 
-function SummaryTile({ icon, label, value, sub, accent, onClick }: any) {
+function SummaryTile({ icon, imgSrc, label, value, sub, accent, onClick }: any) {
   return (
     <button onClick={onClick} className={`text-left rounded-2xl p-6 border transition ${accent ? "grad-border glass-strong" : "border-white/8 bg-white/[0.02] hover:border-violet-400/25"}`}>
       <div className="flex items-center justify-between">
         <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${accent ? "bg-violet-400/15 text-violet-200" : "bg-white/5 text-white/70"}`}>
-          <Icon name={icon} size={18} />
+          {imgSrc ? <img src={imgSrc} alt="" className="w-5 h-5 opacity-70" /> : <Icon name={icon} size={18} />}
         </div>
         {onClick && <Icon name="arrow-up-right" size={14} className="text-white/30" />}
       </div>
@@ -3040,7 +3040,7 @@ export default function DashboardApp() {
             {route === "settings"  && <SettingsPage freighter={freighter} />}
           </RouteTransition>
           <div className="text-center text-[11px] font-mono text-white/30 pt-12 pb-12">
-            Drip · {IS_STELLAR_MODE ? "Stellar Testnet" : PROTOCOL_STATS.clusterLabel} · {PROTOCOL_STATS.version} · made with love for the streaming economy
+            Drip · {IS_STELLAR_MODE ? "Stellar Testnet" : PROTOCOL_STATS.clusterLabel} · {PROTOCOL_STATS.version}
           </div>
         </main>
       </div>

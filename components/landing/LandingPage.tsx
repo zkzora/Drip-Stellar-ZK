@@ -451,7 +451,10 @@ function StreamingCard() {
         <div className="mt-7">
           <div className="text-[10.5px] uppercase tracking-[0.2em] text-white/40 font-mono">Received · {CARD.token}</div>
           <div className="mt-3 flex items-baseline gap-1 num-stable">
-            <span className="text-white/40 text-[34px] font-num">{IS_STELLAR_MODE ? "✦" : "◎"}</span>
+            {IS_STELLAR_MODE
+              ? <img src="/stellar-logo.png" alt="XLM" className="w-8 h-8 opacity-50 self-center mb-1" />
+              : <span className="text-white/40 text-[34px] font-num">◎</span>
+            }
             <span className="text-iri text-[58px] font-num leading-none tracking-[-0.02em]">{whole}</span>
             <span className="text-iri text-[58px] font-num leading-none tracking-[-0.02em]">.</span>
             <span className="text-iri text-[58px] font-num leading-none tracking-[-0.02em]">{stableDec}</span>
