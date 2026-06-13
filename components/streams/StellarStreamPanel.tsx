@@ -936,10 +936,15 @@ function StellarTrackedStreamCard({
   const actionEnabled = (action: "pause" | "resume" | "withdraw" | "cancel"): boolean => {
     const s = localState?.status;
     if (!s) return false;
-    if (action === "pause")    return s === "Active";
-    if (action === "resume")   return s === "Paused";
-    if (action === "withdraw") return s === "Active";
-    if (action === "cancel")   return s !== "Cancelled" && s !== "Completed";
+    const wallet = freighter.address ?? "";
+    const payer    = localState?.payer    || stream.payer    || "";
+    const receiver = localState?.receiver || stream.receiver || "";
+    const isPayer    = wallet === payer;
+    const isReceiver = wallet === receiver;
+    if (action === "pause")    return s === "Active"  && isPayer;
+    if (action === "resume")   return s === "Paused"  && isPayer;
+    if (action === "withdraw") return s === "Active"  && isReceiver;
+    if (action === "cancel")   return s !== "Cancelled" && s !== "Completed" && isPayer;
     return true;
   };
 
