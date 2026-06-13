@@ -347,7 +347,7 @@ export const AGENT_LOG_DEMO = {
 };
 
 export const DASHBOARD_NAV_ITEMS = [
-  { k: "dashboard", icon: "gauge",            label: "Dashboard" },
+  { k: "dashboard", icon: "gauge", imgSrc: "/stellar-logo.png", label: "Dashboard" },
   { k: "streams",   icon: "waves",            label: "Streams", hasStreamBadge: true },
   { k: "yield",     icon: "sprout",           label: "Yield" },
   { k: "history",   icon: "scroll-text",      label: "History" },
