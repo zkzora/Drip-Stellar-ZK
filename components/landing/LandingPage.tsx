@@ -332,7 +332,7 @@ function DripMark({ size = 28 }: any) {
 // =========================================================================
 function Hero() {
   return (
-    <section className={`relative ${IS_STELLAR_MODE ? "pt-52 pb-72" : "pt-16 pb-28"}`}>
+    <section className={`relative ${IS_STELLAR_MODE ? "pt-20 pb-40" : "pt-16 pb-28"}`}>
       <div className={`max-w-[1240px] mx-auto px-6 grid lg:grid-cols-12 gap-10 ${IS_STELLAR_MODE ? "items-center" : "items-start"}`}>
         <div className={`lg:col-span-7 ${IS_STELLAR_MODE ? "pt-0" : "pt-8"}`}>
 
@@ -348,7 +348,7 @@ function Hero() {
           </div>
 
           {/* Headline */}
-          <h1 className={`anim-fade-up delay-80 ${IS_STELLAR_MODE ? "text-[52px] sm:text-[70px] lg:text-[96px]" : "text-[38px] sm:text-[52px] lg:text-[68px]"} leading-[1.02] font-medium tracking-[-0.025em] text-iri-anim`}>
+          <h1 className={`anim-fade-up delay-80 ${IS_STELLAR_MODE ? "text-[44px] sm:text-[60px] lg:text-[80px]" : "text-[38px] sm:text-[52px] lg:text-[68px]"} leading-[1.02] font-medium tracking-[-0.025em] text-iri-anim`}>
             {IS_STELLAR_MODE ? (
               <>Programmable<br />XLM Payment<br />Streams.</>
             ) : (
@@ -434,7 +434,7 @@ function StreamingCard() {
 
   return (
     <div className="grad-border rounded-3xl glass-strong p-1.5 shadow-[0_30px_120px_-30px_rgba(139,92,246,0.5)]">
-      <div className={`rounded-[20px] bg-gradient-to-b from-[#100e26]/90 to-[#07060f]/95 ${IS_STELLAR_MODE ? "p-10" : "p-6"} relative overflow-hidden`}>
+      <div className={`rounded-[20px] bg-gradient-to-b from-[#100e26]/90 to-[#07060f]/95 ${IS_STELLAR_MODE ? "p-8" : "p-6"} relative overflow-hidden`}>
         {/* corner glow */}
         <div className="absolute -top-20 -right-20 w-60 h-60 iri-orb rounded-full opacity-50" />
         <div className="absolute -bottom-24 -left-24 w-72 h-72 glow-orb opacity-30" />
