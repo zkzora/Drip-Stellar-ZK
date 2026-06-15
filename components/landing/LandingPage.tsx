@@ -332,9 +332,9 @@ function DripMark({ size = 28 }: any) {
 // =========================================================================
 function Hero() {
   return (
-    <section className={`relative ${IS_STELLAR_MODE ? "pt-32 pb-56" : "pt-16 pb-28"}`}>
-      <div className="max-w-[1240px] mx-auto px-6 grid lg:grid-cols-12 gap-10 items-start">
-        <div className={`lg:col-span-7 ${IS_STELLAR_MODE ? "pt-20" : "pt-8"}`}>
+    <section className={`relative ${IS_STELLAR_MODE ? "pt-36 pb-56" : "pt-16 pb-28"}`}>
+      <div className={`max-w-[1240px] mx-auto px-6 grid lg:grid-cols-12 gap-10 ${IS_STELLAR_MODE ? "items-center" : "items-start"}`}>
+        <div className={`lg:col-span-7 ${IS_STELLAR_MODE ? "pt-0" : "pt-8"}`}>
 
           {/* Badge */}
           <div className="anim-fade-down delay-0 inline-flex items-center gap-2 rounded-full border border-violet-400/25 bg-violet-400/5 px-3 py-1.5 text-[12px] text-violet-200/90 mb-7">
