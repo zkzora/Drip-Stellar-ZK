@@ -501,7 +501,12 @@ function StreamingCard() {
             <span className="text-white/85">{CARD.token}</span>
             <span className="ml-1.5 text-white/35">{CARD.tokenKind}</span>
           </DetailRow>
-          {!IS_STELLAR_MODE && (
+          {IS_STELLAR_MODE ? (
+            <DetailRow label="ZK Privacy">
+              <span className="text-white/85">Drip Private</span>
+              <span className="ml-1.5 text-violet-300/60 text-[9.5px] font-mono uppercase tracking-[0.14em]">UltraHonk</span>
+            </DetailRow>
+          ) : (
             <DetailRow label="Yield (roadmap)">
               <span className="text-white/35 line-through">{PROTOCOL_STATS.yieldApy.toFixed(2)}% APY</span>
               <span className="ml-2 text-[9.5px] font-mono text-amber-300/60 uppercase tracking-[0.14em]">coming soon</span>
