@@ -336,6 +336,16 @@ function Hero() {
       <div className="max-w-[1240px] mx-auto px-6 grid lg:grid-cols-12 gap-10 items-start">
         <div className="lg:col-span-7 pt-8">
 
+          {/* Badge */}
+          <div className="anim-fade-down delay-0 inline-flex items-center gap-2 rounded-full border border-violet-400/25 bg-violet-400/5 px-3 py-1.5 text-[12px] text-violet-200/90 mb-7">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-violet-300 opacity-75 animate-ping" />
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-violet-300" />
+            </span>
+            <span className="font-mono uppercase tracking-[0.16em]">
+              {IS_STELLAR_MODE ? "Now live on Stellar Testnet · Stellar Hacks 2026" : "Now live on Solana devnet · 2026 cohort"}
+            </span>
+          </div>
 
           {/* Headline */}
           <h1 className="anim-fade-up delay-80 text-[38px] sm:text-[52px] lg:text-[68px] leading-[1.02] font-medium tracking-[-0.025em] text-iri-anim">
@@ -358,7 +368,11 @@ function Hero() {
             <a href="/dashboard" className="btn-primary rounded-full px-5 py-3 text-[14px] font-medium text-white flex items-center gap-2">
               <Icon name="zap" size={15} /> {IS_STELLAR_MODE ? "Launch Stellar Testnet App" : "Launch App"}
             </a>
-            {!IS_STELLAR_MODE && (
+            {IS_STELLAR_MODE ? (
+              <a href="/docs" className="btn-ghost rounded-full px-5 py-3 text-[14px] text-white/90 flex items-center gap-2">
+                <Icon name="book-open" size={15} /> Read the docs
+              </a>
+            ) : (
               <button className="btn-ghost rounded-full px-5 py-3 text-[14px] text-white/90 flex items-center gap-2">
                 <Icon name="terminal" size={15} /> Build on Drip
               </button>
