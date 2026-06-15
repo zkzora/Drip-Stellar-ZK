@@ -332,9 +332,9 @@ function DripMark({ size = 28 }: any) {
 // =========================================================================
 function Hero() {
   return (
-    <section className={`relative ${IS_STELLAR_MODE ? "pt-24 pb-44" : "pt-16 pb-28"}`}>
+    <section className={`relative ${IS_STELLAR_MODE ? "pt-32 pb-56" : "pt-16 pb-28"}`}>
       <div className="max-w-[1240px] mx-auto px-6 grid lg:grid-cols-12 gap-10 items-start">
-        <div className={`lg:col-span-7 ${IS_STELLAR_MODE ? "pt-14" : "pt-8"}`}>
+        <div className={`lg:col-span-7 ${IS_STELLAR_MODE ? "pt-20" : "pt-8"}`}>
 
           {/* Badge */}
           <div className="anim-fade-down delay-0 inline-flex items-center gap-2 rounded-full border border-violet-400/25 bg-violet-400/5 px-3 py-1.5 text-[12px] text-violet-200/90 mb-7">
@@ -348,7 +348,7 @@ function Hero() {
           </div>
 
           {/* Headline */}
-          <h1 className={`anim-fade-up delay-80 ${IS_STELLAR_MODE ? "text-[42px] sm:text-[58px] lg:text-[76px]" : "text-[38px] sm:text-[52px] lg:text-[68px]"} leading-[1.02] font-medium tracking-[-0.025em] text-iri-anim`}>
+          <h1 className={`anim-fade-up delay-80 ${IS_STELLAR_MODE ? "text-[46px] sm:text-[62px] lg:text-[84px]" : "text-[38px] sm:text-[52px] lg:text-[68px]"} leading-[1.02] font-medium tracking-[-0.025em] text-iri-anim`}>
             {IS_STELLAR_MODE ? (
               <>Programmable<br />XLM Payment<br />Streams.</>
             ) : (
