@@ -1003,8 +1003,10 @@ function StellarTrackedStreamCard({
         onReset={resetTx}
         actionEnabled={actionEnabled}
         isPrivate={isPrivate}
-        proofButton={
-          isPrivate ? (
+        proofButton={(() => {
+          const receiver = localState?.receiver || stream.receiver || "";
+          const isReceiver = !!freighter.address && freighter.address === receiver;
+          return isPrivate && isReceiver ? (
             <GenerateProofButton
               streamId={stream.streamId}
               sourceAddress={freighter.address ?? null}
@@ -1015,8 +1017,8 @@ function StellarTrackedStreamCard({
               autoOpen={proofLinkMatch && isPrivate}
               compact
             />
-          ) : null
-        }
+          ) : null;
+        })()}
       />
       {onRemove && (
         <div className="mt-3 pt-3 border-t border-white/5 flex justify-end opacity-0 group-hover:opacity-100 transition">
