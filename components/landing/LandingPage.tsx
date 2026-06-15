@@ -350,7 +350,7 @@ function Hero() {
           {/* Headline */}
           <h1 className="anim-fade-up delay-80 text-[38px] sm:text-[52px] lg:text-[68px] leading-[1.02] font-medium tracking-[-0.025em] text-iri-anim">
             {IS_STELLAR_MODE ? (
-              <>Programmable XLM<br />Payment Streams.</>
+              <>Programmable<br />XLM Payment<br />Streams.</>
             ) : (
               <>Programmable Cashflow<br />for AI Agents.</>
             )}
