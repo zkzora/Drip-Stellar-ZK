@@ -906,13 +906,15 @@ function StellarTrackedStreamCard({
     }
     setTxResult({ txHash: submitResult.txHash, returnValue: submitResult.returnValue });
     setTxPhase("done");
-    // Refresh on-chain state after a brief delay
-    setTimeout(async () => {
+    // Refresh on-chain state — poll twice since Stellar testnet block time is ~5-6s
+    const refreshState = async () => {
       try {
         const r = await getStreamState(BigInt(stream.streamId));
         if (r.ok && r.stream) setLocalState(r.stream);
       } catch { /* ignore */ }
-    }, 3500);
+    };
+    setTimeout(refreshState, 6000);
+    setTimeout(refreshState, 12000);
   }, [pendingXdr, freighter.networkPassphrase, stream.streamId]);
 
   const handleAction = useCallback(
@@ -1170,14 +1172,16 @@ export function StellarStreamPanel({
       }
     }
 
-    // Auto-refresh state for manage-stream actions (legacy single-stream view)
+    // Auto-refresh state for manage-stream actions — poll twice for Stellar testnet ~5-6s block time
     if (!isCreate && manageId && manageIdValid) {
-      setTimeout(async () => {
+      const refreshManage = async () => {
         try {
           const r = await getStreamState(BigInt(manageId.trim()));
           if (r.ok && r.stream) setLoadedStream(r.stream);
         } catch { /* ignore */ }
-      }, 3500);
+      };
+      setTimeout(refreshManage, 6000);
+      setTimeout(refreshManage, 12000);
     }
   }, [pendingXdr, freighter.networkPassphrase, previewInfo, freighter.address, stellarStreams, manageId, manageIdValid, privateMode]);
 
