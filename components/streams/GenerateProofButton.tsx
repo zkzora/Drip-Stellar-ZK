@@ -46,7 +46,6 @@ export function GenerateProofButton({
   const [error, setError] = useState<string | null>(null);
   const [proofHex, setProofHex] = useState<string>("");
   const [proofBytes, setProofBytes] = useState<Uint8Array | null>(null);
-  const [copied, setCopied] = useState(false);
   const [copiedShare, setCopiedShare] = useState(false);
 
   // Auto-fill the salt from a shared proof link (URL params) or, failing that,
@@ -130,12 +129,6 @@ export function GenerateProofButton({
     }
     setPhase(res.verified ? "verified" : "rejected");
   }, [proofBytes, thresholdStroops, sourceAddress, streamId]);
-
-  const copyProof = useCallback(() => {
-    void navigator.clipboard?.writeText(proofHex);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  }, [proofHex]);
 
   // Build a share code only when we have a proof + threshold — safe to send to a
   // third party. It contains the proof, stream id, and threshold, but never the
@@ -326,17 +319,19 @@ export function GenerateProofButton({
                 {(phase === "proved" || phase === "verifying" || phase === "verified" || phase === "rejected") &&
                   proofHex && (
                     <div className="rounded-xl border border-white/8 bg-white/[0.02] p-3.5 space-y-2">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Icon name="check-circle-2" size={12} className="text-emerald-300/70" />
                         <span className="text-[10px] uppercase tracking-[0.16em] text-white/45 font-mono">
-                          Proof ({proofBytes?.length ?? 0} bytes)
+                          Proof generated · {proofBytes?.length ?? 0} bytes
                         </span>
-                        <button onClick={copyProof} className="text-[10.5px] text-white/45 hover:text-white/80 flex items-center gap-1">
-                          <Icon name="copy" size={11} /> {copied ? "Copied" : "Copy"}
-                        </button>
                       </div>
-                      <code className="block text-[10.5px] font-mono text-white/55 break-all max-h-20 overflow-auto">
-                        {proofHex.slice(0, 220)}…
+                      <code className="block text-[10.5px] font-mono text-white/35 break-all max-h-16 overflow-auto">
+                        {proofHex.slice(0, 180)}…
                       </code>
+                      <p className="text-[10px] text-white/30 leading-relaxed">
+                        Raw proof (technical). To let someone verify, use{" "}
+                        <span className="text-violet-300/70">Copy share code</span> below.
+                      </p>
                     </div>
                   )}
 

@@ -67,6 +67,13 @@ export function decodeProofPackage(code: string): DecodedProof {
   const trimmed = code.trim();
   if (!trimmed) throw new Error("Empty share code.");
 
+  // Common mistake: pasting the raw proof hex (0x000…) instead of the share code.
+  if (/^0x[0-9a-fA-F]+$/.test(trimmed)) {
+    throw new Error(
+      "That's the raw proof, not the share code. In the proof drawer use the \"Copy share code\" button (under \"Share with a verifier\").",
+    );
+  }
+
   let json: string;
   if (trimmed.startsWith("{")) {
     json = trimmed; // already a raw JSON envelope (e.g. an uploaded .json file)
