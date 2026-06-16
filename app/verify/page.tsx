@@ -115,14 +115,9 @@ export default function VerifyPage() {
         </div>
 
         {/* Title */}
-        <div className="flex items-center gap-3 mb-3">
-          <span className="w-10 h-10 rounded-full bg-violet-500/15 border border-violet-400/30 flex items-center justify-center">
-            <Icon name="shield-check" size={18} className="text-violet-300" />
-          </span>
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.2em] text-violet-300/70 font-mono">Drip Private</div>
-            <h1 className="text-[26px] tracking-tight font-medium">Verify Income Proof</h1>
-          </div>
+        <div className="mb-3">
+          <div className="text-[10px] uppercase tracking-[0.2em] text-violet-300/70 font-mono mb-1.5">Drip Private</div>
+          <h1 className="text-[26px] tracking-tight font-medium">Verify Income Proof</h1>
         </div>
         <p className="text-[13.5px] text-white/55 leading-relaxed mb-8 max-w-[520px]">
           Paste a share code from a stream receiver to confirm — on-chain — that their income meets a
