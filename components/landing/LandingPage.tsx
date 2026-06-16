@@ -287,9 +287,6 @@ function Nav() {
           </nav>
         </div>
         <div className="flex items-center gap-2">
-          <a href="/dashboard" className="hidden md:flex btn-ghost rounded-full px-4 py-2 text-[13px] text-white/85 hover:text-white items-center">
-            Sign in
-          </a>
           <a href="/dashboard" className="btn-primary rounded-full px-4 py-2 text-[13px] font-medium text-white flex items-center gap-1.5">
             Launch app <Icon name="arrow-up-right" size={14} />
           </a>
@@ -315,7 +312,7 @@ function Nav() {
             </a>
           ))}
           <a href="/dashboard" className="flex items-center gap-2 text-[14px] text-white/70 hover:text-white py-2.5">
-            <Icon name="arrow-up-right" size={15} /> Sign in to app
+            <Icon name="arrow-up-right" size={15} /> Launch app
           </a>
         </div>
       )}
