@@ -83,16 +83,18 @@ NEXT_PUBLIC_STELLAR_ZK_CONTRACT_ID=CCUOR6VPMCFDOU7MODZGOI2K264YR3LNRSQ4LMJ37LGTZ
 **As the payer:**
 1. Open the dashboard, connect Freighter (testnet).
 2. Create a stream → toggle **Private Mode ON**.
-3. After creation, the *Drip Private* modal generates a random salt, computes `commitment = pedersen(amount, salt)`, and submits `register_commitment` to the verifier contract on-chain.
-4. Click **Copy Proof Link** — a shareable URL is copied to clipboard containing the stream ID and salt.
-5. Send the link to the receiver via any channel. The stream shows a **Private** badge on the dashboard.
+3. After creation, the *Drip Private* modal generates a random salt, computes `commitment = pedersen(amount, salt)`, and submits `register_commitment` to the verifier contract on-chain. The stream shows a **Private** badge.
+4. The salt is saved to `localStorage`; an optional shareable link lets the receiver auto-fill the proof form on another device. *(This link contains the salt — it is for the receiver only, never a third party.)*
 
 **As the receiver:**
-1. Open the shared proof link — dashboard loads, proof drawer auto-opens.
-2. Stream amount and salt are **auto-filled**. Only enter the threshold (e.g. 100 XLM).
-3. Click **Generate Proof** — Noir.js + Barretenberg run locally in your browser (~5–10 seconds).
-4. Click **Verify on Stellar** — proof is submitted to `drip_zk_verifier` on testnet.
-5. Contract returns `true` → UI shows **Income Verified: stream pays ≥ [threshold] XLM/month**.
+1. Open the stream (proof drawer auto-fills amount + salt) and enter the threshold to prove (e.g. 100 XLM).
+2. Click **Generate Proof** — Noir.js + Barretenberg run locally in your browser (~5–10 seconds). The amount never leaves your device.
+3. In **Share with a verifier**, copy the `/verify` **link** and the **share code** (proof + stream ID + threshold — but *not* the amount or salt). Send both to whoever needs to check your income.
+
+**As a verifier (anyone — no wallet, no Drip account):**
+1. Open the **`/verify`** page (linked from the landing nav).
+2. Paste the share code (or upload the `.json`) and click **Verify on Stellar**.
+3. The page runs a read-only `verify_income_proof` simulation against the live contract and shows **Income Verified** or **Not Verified** — without ever learning the actual amount.
 
 Normal streams (Private Mode off) are completely unaffected.
 
@@ -132,10 +134,14 @@ stellar/
 lib/
   zk/zkProof.ts                Browser proof generation (Noir.js + bb.js)
   stellar/zkVerifier.ts        Soroban verifier contract client
+  stellar/proofShare.ts        Encode/decode shareable proof codes + sim source
+
+app/
+  verify/page.tsx              Public proof verification page (no wallet needed)
 
 components/streams/
   PrivateStreamModal.tsx        Payer: generates salt, registers commitment
-  GenerateProofButton.tsx       Receiver: generates + submits proof
+  GenerateProofButton.tsx       Receiver: generates proof + share code
   StellarStreamPanel.tsx        Dashboard stream list with Private 🔒 badge
 ```
 
@@ -157,8 +163,10 @@ components/streams/
 - Browser-side UltraHonk proof generation with Noir.js (~5–10s)
 - On-chain proof verification via Stellar's BN254 host functions
 - `has_commitment` flag drives the **Private** dashboard badge
-- **Shareable Proof Link** — payer copies a URL containing the stream ID and salt; receiver opens it and the proof form auto-fills (amount + salt), no manual copy-paste
-- Salt also persisted in `localStorage` so re-opening the proof form on the same device skips the link entirely
+- Income proof generation is **receiver-only** — the proof button is hidden from the payer
+- **Public `/verify` page** — any third party can verify a proof with no wallet and no Drip account; the page funds a throwaway Friendbot account for the read-only simulation
+- **Shareable proof code** — receiver exports a compact code (or `.json`) bundling the proof + stream ID + threshold; the amount and salt are never included, so it is safe to send to anyone
+- Receiver-convenience proof link persists the salt in `localStorage` / an optional URL so re-opening the proof form on the same device skips manual entry
 - Selective disclosure: receiver chooses what threshold to prove, to whom, and when
 
 ### Compliance & Reporting
@@ -245,6 +253,7 @@ cd .. && npm install && npm run dev
 |---|---|
 | `/` | Landing page — hero, features, calculator, use cases |
 | `/dashboard` | Stream management with Private 🔒 badges and Income Proof actions |
+| `/verify` | Public ZK proof verification — paste a share code, verify on-chain, no wallet |
 | `/docs` | Documentation hub |
 | `/compliance` | Compliance reporting and CSV export |
 | `/faq` | Frequently asked questions |

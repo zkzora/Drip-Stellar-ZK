@@ -135,11 +135,15 @@ In the dashboard's **Stellar Testnet** panel:
    *Private Stream* modal generates a salt (save it!) and registers the
    commitment on-chain. The stream now shows a **Private 🔒** badge and its
    amount renders as **Hidden**.
-2. As the receiver, click **Income Proof** on the private stream. Enter the
-   threshold, the stream amount, and the saved salt → **Generate Proof**
-   (~5–10s, runs locally in the browser).
+2. As the receiver, click **Income Proof** on the private stream (the button is
+   receiver-only). Enter the threshold; the stream amount and salt auto-fill →
+   **Generate Proof** (~5–10s, runs locally in the browser).
 3. Click **Verify on Stellar** → the proof is checked by the
    `drip_zk_verifier` contract → **✅ Income Verified: ≥ <threshold> XLM/month**.
+4. To let a third party check it, open **Share with a verifier** and copy the
+   share code + the `/verify` link. Anyone can open **`/verify`**, paste the
+   code, and confirm the result on-chain — no wallet required. The share code
+   contains the proof, stream ID, and threshold, but never the amount or salt.
 
 > bb.js runs single-threaded unless the page is *cross-origin isolated*
 > (COOP/COEP headers). It still works without isolation — proving is just a few
