@@ -10,7 +10,7 @@ const nextConfig = {
     return [
       {
         // public images/fonts — cache 7 days, stale-while-revalidate 30 days
-        source: "/:path*\\.(png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf)",
+        source: "/(.*)\\.(png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf)",
         headers: [
           {
             key: "Cache-Control",
