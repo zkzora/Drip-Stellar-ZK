@@ -47,6 +47,7 @@ export function GenerateProofButton({
   const [proofHex, setProofHex] = useState<string>("");
   const [proofBytes, setProofBytes] = useState<Uint8Array | null>(null);
   const [copiedShare, setCopiedShare] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   // Auto-fill the salt from a shared proof link (URL params) or, failing that,
   // from localStorage saved when the payer registered the commitment. This lets
@@ -144,6 +145,17 @@ export function GenerateProofButton({
     setCopiedShare(true);
     setTimeout(() => setCopiedShare(false), 1500);
   }, [shareCode]);
+
+  const verifyUrl = useMemo(
+    () => (typeof window !== "undefined" ? `${window.location.origin}/verify` : "/verify"),
+    [],
+  );
+
+  const copyVerifyLink = useCallback(() => {
+    void navigator.clipboard?.writeText(verifyUrl);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 1500);
+  }, [verifyUrl]);
 
   const downloadProof = useCallback(() => {
     if (!proofBytes || !thresholdStroops) return;
@@ -344,17 +356,33 @@ export function GenerateProofButton({
                         <div>
                           <p className="text-[12px] text-violet-100/90 font-medium">Share with a verifier</p>
                           <p className="text-[10.5px] text-white/40 mt-0.5 leading-relaxed">
-                            Send this code to anyone. They verify at{" "}
-                            <span className="font-mono text-violet-300/70">/verify</span> — your amount and salt
-                            stay private.
+                            Two steps: send the verifier the link, then the code. Your amount and salt stay private.
                           </p>
                         </div>
                       </div>
+
+                      {/* Step 1 — the verify link */}
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 flex items-center gap-1.5 rounded-lg px-2.5 py-2 bg-white/[0.03] border border-white/8 min-w-0">
+                          <span className="text-[9px] font-mono uppercase tracking-wider text-white/30 shrink-0">1</span>
+                          <span className="text-[10.5px] font-mono text-white/55 truncate">{verifyUrl}</span>
+                        </div>
+                        <button
+                          onClick={copyVerifyLink}
+                          className="rounded-lg py-2 px-3 text-[11.5px] border border-white/10 bg-white/[0.03] text-white/70 hover:text-white hover:border-white/20 transition flex items-center justify-center gap-1.5 shrink-0"
+                        >
+                          <Icon name={copiedLink ? "check" : "link"} size={12} />
+                          {copiedLink ? "Copied" : "Link"}
+                        </button>
+                      </div>
+
+                      {/* Step 2 — the share code */}
                       <div className="flex items-center gap-2">
                         <button
                           onClick={copyShareCode}
                           className="flex-1 rounded-lg py-2 text-[11.5px] font-medium border border-violet-400/30 bg-violet-500/15 text-violet-100 hover:bg-violet-500/25 transition flex items-center justify-center gap-1.5"
                         >
+                          <span className="text-[9px] font-mono text-violet-300/60">2</span>
                           <Icon name={copiedShare ? "check" : "copy"} size={12} />
                           {copiedShare ? "Copied" : "Copy share code"}
                         </button>

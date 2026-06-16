@@ -262,6 +262,7 @@ const NAV_LINKS = [
   { label: "Use cases", href: "#use-cases" },
   { label: "Developers", href: "#developers" },
   { label: "Ecosystem", href: "#ecosystem" },
+  ...(IS_STELLAR_MODE ? [{ label: "Verify", href: "/verify" }] : []),
   { label: "Docs", href: "/docs" },
 ];
 
