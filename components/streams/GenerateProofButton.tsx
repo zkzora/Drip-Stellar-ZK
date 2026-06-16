@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { generateIncomeProof, proofToHex } from "@/lib/zk/zkProof";
 import { verifyIncomeProof, isZkConfigured } from "@/lib/stellar/zkVerifier";
+import { encodeProofPackage, proofPackageFile } from "@/lib/stellar/proofShare";
 
 const STROOPS_PER_XLM = 10_000_000;
 
@@ -46,6 +47,7 @@ export function GenerateProofButton({
   const [proofHex, setProofHex] = useState<string>("");
   const [proofBytes, setProofBytes] = useState<Uint8Array | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedShare, setCopiedShare] = useState(false);
 
   // Auto-fill the salt from a shared proof link (URL params) or, failing that,
   // from localStorage saved when the payer registered the commitment. This lets
@@ -134,6 +136,33 @@ export function GenerateProofButton({
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }, [proofHex]);
+
+  // Build a share code only when we have a proof + threshold — safe to send to a
+  // third party. It contains the proof, stream id, and threshold, but never the
+  // amount or salt.
+  const shareCode = useMemo(() => {
+    if (!proofBytes || !thresholdStroops) return "";
+    return encodeProofPackage({ streamId, thresholdStroops, proof: proofBytes });
+  }, [proofBytes, thresholdStroops, streamId]);
+
+  const copyShareCode = useCallback(() => {
+    if (!shareCode) return;
+    void navigator.clipboard?.writeText(shareCode);
+    setCopiedShare(true);
+    setTimeout(() => setCopiedShare(false), 1500);
+  }, [shareCode]);
+
+  const downloadProof = useCallback(() => {
+    if (!proofBytes || !thresholdStroops) return;
+    const body = proofPackageFile({ streamId, thresholdStroops, proof: proofBytes });
+    const blob = new Blob([body], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `drip-proof-stream-${streamId}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [proofBytes, thresholdStroops, streamId]);
 
   const busy = phase === "proving" || phase === "verifying";
 
@@ -308,6 +337,40 @@ export function GenerateProofButton({
                       <code className="block text-[10.5px] font-mono text-white/55 break-all max-h-20 overflow-auto">
                         {proofHex.slice(0, 220)}…
                       </code>
+                    </div>
+                  )}
+
+                {/* Share with a verifier — safe to send; no amount or salt inside */}
+                {(phase === "proved" || phase === "verifying" || phase === "verified" || phase === "rejected") &&
+                  shareCode && (
+                    <div className="rounded-xl border border-violet-400/15 bg-violet-400/[0.04] p-3.5 space-y-3">
+                      <div className="flex items-start gap-2">
+                        <Icon name="send" size={13} className="text-violet-300/80 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-[12px] text-violet-100/90 font-medium">Share with a verifier</p>
+                          <p className="text-[10.5px] text-white/40 mt-0.5 leading-relaxed">
+                            Send this code to anyone. They verify at{" "}
+                            <span className="font-mono text-violet-300/70">/verify</span> — your amount and salt
+                            stay private.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={copyShareCode}
+                          className="flex-1 rounded-lg py-2 text-[11.5px] font-medium border border-violet-400/30 bg-violet-500/15 text-violet-100 hover:bg-violet-500/25 transition flex items-center justify-center gap-1.5"
+                        >
+                          <Icon name={copiedShare ? "check" : "copy"} size={12} />
+                          {copiedShare ? "Copied" : "Copy share code"}
+                        </button>
+                        <button
+                          onClick={downloadProof}
+                          title="Download as .json"
+                          className="rounded-lg py-2 px-3 text-[11.5px] border border-white/10 bg-white/[0.03] text-white/60 hover:text-white hover:border-white/20 transition flex items-center justify-center gap-1.5"
+                        >
+                          <Icon name="download" size={12} /> .json
+                        </button>
+                      </div>
                     </div>
                   )}
 

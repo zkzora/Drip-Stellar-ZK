@@ -3,6 +3,7 @@
 import {
   Activity,
   ArrowDownLeft,
+  ArrowLeft,
   ArrowLeftRight,
   ArrowRight,
   ArrowUpRight,
@@ -68,6 +69,7 @@ import {
   Terminal,
   TrendingUp,
   TriangleAlert,
+  Upload,
   Twitter,
   User,
   Users,
@@ -89,6 +91,7 @@ type IconProps = {
 const ICONS: Record<string, React.ComponentType<LucideProps>> = {
   activity: Activity,
   "arrow-down-left": ArrowDownLeft,
+  "arrow-left": ArrowLeft,
   "arrow-left-right": ArrowLeftRight,
   "arrow-right": ArrowRight,
   "arrow-up-right": ArrowUpRight,
@@ -152,6 +155,7 @@ const ICONS: Record<string, React.ComponentType<LucideProps>> = {
   terminal: Terminal,
   "trending-up": TrendingUp,
   "triangle-alert": TriangleAlert,
+  upload: Upload,
   twitter: Twitter,
   user: User,
   users: Users,
