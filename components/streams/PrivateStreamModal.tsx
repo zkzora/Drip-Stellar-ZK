@@ -37,6 +37,9 @@ export function PrivateStreamModal({
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [copied, setCopied] = useState<"salt" | "commitment" | "link" | null>(null);
+  // When false, the salt is never written to localStorage — the payer must hand
+  // it to the receiver manually. Default on for convenience.
+  const [saveSalt, setSaveSalt] = useState(true);
 
   // Generate salt + commitment once on mount.
   useEffect(() => {
@@ -95,9 +98,9 @@ export function PrivateStreamModal({
     }
     setTxHash(submit.txHash ?? null);
     setPhase("done");
-    // Save the salt locally so the proof form can auto-fill it later, and so a
-    // shareable proof link can be generated for the receiver.
-    if (typeof window !== "undefined" && salt !== null) {
+    // Save the salt locally so the proof form can auto-fill it later — only when
+    // the payer opted in. Otherwise it never touches localStorage.
+    if (saveSalt && typeof window !== "undefined" && salt !== null) {
       try {
         window.localStorage.setItem(`drip:proof-salt:${streamId}`, salt.toString());
       } catch {
@@ -105,7 +108,7 @@ export function PrivateStreamModal({
       }
     }
     onRegistered?.(streamId);
-  }, [commitment, freighter.networkPassphrase, payerAddress, streamId, salt, onRegistered]);
+  }, [commitment, freighter.networkPassphrase, payerAddress, streamId, salt, saveSalt, onRegistered]);
 
   const copyProofLink = useCallback(() => {
     if (typeof window === "undefined" || salt === null) return;
@@ -188,6 +191,29 @@ export function PrivateStreamModal({
                   </p>
                 </div>
 
+                {/* Salt persistence choice — only before registering */}
+                {phase === "ready" && (
+                  <label className="flex items-start gap-2.5 px-1 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={!saveSalt}
+                      onChange={(e) => setSaveSalt(!e.target.checked)}
+                      className="mt-0.5 accent-violet-500 w-3.5 h-3.5"
+                    />
+                    <span className="text-[10.5px] text-white/45 leading-relaxed">
+                      <span className="text-white/70">Don&apos;t save the salt on this device.</span> You&apos;ll copy
+                      it once and hand it to the receiver yourself. More private, but there is no recovery if you
+                      lose it.
+                    </span>
+                  </label>
+                )}
+                {phase === "ready" && saveSalt && (
+                  <p className="text-[10px] text-white/30 px-1 leading-relaxed -mt-1">
+                    Salt will be stored locally for convenience. Clearing browser data will require re-entry from
+                    your shareable link.
+                  </p>
+                )}
+
                 {/* Commitment */}
                 <div className="rounded-xl border border-white/8 bg-white/[0.02] p-3.5">
                   <div className="flex items-center justify-between mb-1.5">
@@ -212,15 +238,19 @@ export function PrivateStreamModal({
                   <Icon name="lock" size={13} className="text-violet-300" /> Commitment registered — stream is now private
                 </div>
                 <p className="text-[11px] text-white/45 leading-relaxed">
-                  Share a link with the receiver — it auto-fills their proof form, no manual salt copy needed.
+                  {saveSalt
+                    ? "Share a link with the receiver — it auto-fills their proof form, no manual salt copy needed."
+                    : "Salt was not saved on this device. Copy the salt above and send it to the receiver yourself — they enter it manually to generate proofs."}
                 </p>
                 <div className="flex items-center gap-3">
-                  <button
-                    onClick={copyProofLink}
-                    className="text-[10.5px] text-violet-300/70 hover:text-violet-200 inline-flex items-center gap-1 transition-colors"
-                  >
-                    <Icon name="link" size={10} /> {copied === "link" ? "Copied!" : "Copy Proof Link"}
-                  </button>
+                  {saveSalt && (
+                    <button
+                      onClick={copyProofLink}
+                      className="text-[10.5px] text-violet-300/70 hover:text-violet-200 inline-flex items-center gap-1 transition-colors"
+                    >
+                      <Icon name="link" size={10} /> {copied === "link" ? "Copied!" : "Copy Proof Link"}
+                    </button>
+                  )}
                   {txHash && (
                     <a
                       href={`${EXPLORER_TX_URL}${txHash}`}

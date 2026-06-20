@@ -8,11 +8,13 @@
 ![Circuit Tests](https://img.shields.io/badge/Noir%20circuit%20tests-3%2F3%20passing-brightgreen?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square)
 
-**Real-time XLM streaming payments on Stellar — with zero-knowledge income proofs.**
+**Drip is the first streaming payment protocol on Stellar with on-chain zero-knowledge income proofs.**
 
-Drip is a streaming payments protocol built on **Stellar Soroban**. Set a flow rate, a max budget, and an expiry — then let the escrow stream XLM by the second with full on-chain enforcement.
+Receivers can prove *"I receive at least X XLM per month from a valid stream"* to any third party — without revealing the actual amount — using a Noir **UltraHonk** proof verified inside a Soroban contract via Stellar's **BN254 host functions** (Protocol 23+). The verifier is a real on-chain check, not a mock.
 
-**Drip Private** extends this with a zero-knowledge layer: a stream receiver can prove *"I receive at least X XLM per month from a valid Drip stream"* to any third party — without revealing the exact amount on-chain. Employment verification, loan applications, credit checks — all provable with a ZK proof verified inside a Soroban contract using Stellar's native BN254 host functions.
+Built on top of a working XLM streaming escrow with full lifecycle controls (create, pause, resume, withdraw, cancel) — set a flow rate, a max budget, and an expiry, then let the escrow stream XLM by the second with full on-chain enforcement.
+
+Employment verification, loan applications, credit checks, rental screening — all provable without leaking the number.
 
 ---
 
@@ -70,7 +72,7 @@ A simpler design would have the payer sign a message — *"I pay this receiver �
 - **Multi-verifier without sharing the salt.** From a single registered commitment the receiver can generate many independent proofs for many verifiers — none of which reveal the salt or the amount. A signature would have to be reissued per verifier and would leak the exact figure.
 - **Payer-availability decoupling.** The receiver can prove their income at any time, even if the payer is offline, unreachable, or no longer cooperative. A signed-attestation scheme makes the payer a permanent online dependency.
 
-See [EXTENSIBILITY.md](EXTENSIBILITY.md) for other proofs the same circuit supports.
+See the [Comparison table](#comparison) for how this stacks up against the alternatives, and [EXTENSIBILITY.md](EXTENSIBILITY.md) for other proofs the same circuit supports.
 
 ---
 
@@ -129,6 +131,20 @@ NEXT_PUBLIC_STELLAR_ZK_CONTRACT_ID=CCUOR6VPMCFDOU7MODZGOI2K264YR3LNRSQ4LMJ37LGTZ
 3. The page runs a read-only `verify_income_proof` simulation against the live contract and shows **Income Verified** or **Not Verified** — without ever learning the actual amount.
 
 Normal streams (Private Mode off) are completely unaffected.
+
+---
+
+## Comparison
+
+How Drip Private's verification compares to the alternatives a receiver might otherwise use:
+
+| Approach | Privacy | Trust assumption | On-chain verifiable |
+|---|---|---|---|
+| Payer signs an attestation | Amount leaked to verifier | Trust the payer keeps signing, per threshold & verifier | No |
+| Off-chain ZK proof | Amount hidden | Trust the prover/verifier ran it honestly | No (off-chain only) |
+| **Drip Private** | **Amount hidden** | **Trustless** | **Yes (BN254 on-chain)** |
+
+See [Why ZK (and not a signed attestation)?](#why-zk-and-not-a-signed-attestation) for the reasoning behind each row.
 
 ---
 

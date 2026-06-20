@@ -13,9 +13,14 @@ import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import { DocsBackground } from "@/components/ui/backgrounds";
 import { decodeProofPackage, getSimulationSource, clearSimulationSource, type DecodedProof } from "@/lib/stellar/proofShare";
-import { verifyIncomeProof, isZkConfigured } from "@/lib/stellar/zkVerifier";
+import { verifyIncomeProof, isZkConfigured, ZK_CONTRACT_ID } from "@/lib/stellar/zkVerifier";
 
 const STROOPS_PER_XLM = 10_000_000;
+const EXPLORER_CONTRACT_URL = "https://stellar.expert/explorer/testnet/contract/";
+
+function shortId(id: string): string {
+  return id.length > 12 ? `${id.slice(0, 6)}…${id.slice(-6)}` : id;
+}
 
 type Phase = "input" | "verifying" | "verified" | "rejected" | "error";
 
@@ -34,6 +39,7 @@ export default function VerifyPage() {
   const [phase, setPhase] = useState<Phase>("input");
   const [error, setError] = useState<string | null>(null);
   const [decoded, setDecoded] = useState<DecodedProof | null>(null);
+  const [verifiedAt, setVerifiedAt] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const configured = useMemo(() => isZkConfigured(), []);
@@ -81,6 +87,7 @@ export default function VerifyPage() {
         setPhase("error");
         return;
       }
+      setVerifiedAt(new Date().toLocaleString());
       setPhase(res.verified ? "verified" : "rejected");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Verification failed.");
@@ -92,6 +99,7 @@ export default function VerifyPage() {
     setPhase("input");
     setError(null);
     setDecoded(null);
+    setVerifiedAt(null);
   }, []);
 
   const busy = phase === "verifying";
@@ -119,10 +127,27 @@ export default function VerifyPage() {
           <div className="text-[10px] uppercase tracking-[0.2em] text-violet-300/70 font-mono mb-1.5">Drip Private</div>
           <h1 className="text-[26px] tracking-tight font-medium">Verify Income Proof</h1>
         </div>
-        <p className="text-[13.5px] text-white/55 leading-relaxed mb-8 max-w-[520px]">
+        <p className="text-[13.5px] text-white/55 leading-relaxed mb-5 max-w-[520px]">
           Paste a share code from a stream receiver to confirm — on-chain — that their income meets a
           threshold. The actual amount stays private. No wallet needed.
         </p>
+
+        {/* Which contract you are trusting */}
+        {configured && (
+          <div className="flex items-center gap-2 mb-8 text-[11px] text-white/40">
+            <Icon name="shield-check" size={12} className="text-violet-300/60 shrink-0" />
+            <span>Verifying against</span>
+            <a
+              href={`${EXPLORER_CONTRACT_URL}${ZK_CONTRACT_ID}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono text-violet-300/80 hover:text-violet-200 underline decoration-dotted underline-offset-2 transition"
+            >
+              {shortId(ZK_CONTRACT_ID)}
+            </a>
+            <span className="text-white/25">· verify this is the official contract</span>
+          </div>
+        )}
 
         {!configured && (
           <div className="rounded-xl border border-amber-400/20 bg-amber-400/5 px-4 py-3 mb-6 text-[12px] text-amber-200/80">
@@ -212,6 +237,36 @@ export default function VerifyPage() {
               The receiver's actual income was never revealed. Only the threshold claim was checked against the
               stream's registered commitment.
             </div>
+
+            {/* Audit trail */}
+            <div className="rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3 space-y-1.5 text-[11px] font-mono text-white/45">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-white/30 uppercase tracking-[0.14em]">Verifier contract</span>
+                <a
+                  href={`${EXPLORER_CONTRACT_URL}${ZK_CONTRACT_ID}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-violet-300/70 hover:text-violet-200 underline decoration-dotted underline-offset-2 flex items-center gap-1"
+                >
+                  {shortId(ZK_CONTRACT_ID)} <Icon name="arrow-up-right" size={10} />
+                </a>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-white/30 uppercase tracking-[0.14em]">Checked at</span>
+                <span className="text-white/55">{verifiedAt}</span>
+              </div>
+            </div>
+
+            {/* What this does NOT prove */}
+            <div className="rounded-xl border border-amber-400/15 bg-amber-400/[0.04] px-4 py-3 text-[11.5px] text-amber-200/70 leading-relaxed flex items-start gap-2">
+              <Icon name="info" size={12} className="text-amber-300/70 shrink-0 mt-0.5" />
+              <span>
+                This is a read-only on-chain check (no transaction submitted). It confirms the proof satisfies the
+                threshold for a commitment registered in the contract above — it does not audit the stream contract
+                itself. Confirm the contract ID matches the official Drip deployment before trusting the result.
+              </span>
+            </div>
+
             <button onClick={reset} className="text-[12.5px] text-white/45 hover:text-white/80 flex items-center gap-1.5 mx-auto transition">
               <Icon name="arrow-left" size={13} /> Verify another
             </button>
