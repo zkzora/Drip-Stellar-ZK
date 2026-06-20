@@ -42,6 +42,38 @@ The ZK is **load-bearing**: without the proof, no one can determine whether a st
 
 ---
 
+## Privacy Model & Threat Analysis
+
+Drip Private provides **selective disclosure**, not full on-chain confidentiality. Being explicit about the boundary:
+
+**What's protected:** The exact stream amount is hidden from a third-party verifier who holds only a share code. They learn a single bit — *amount ≥ threshold* — and nothing more. They need no access to the stream itself.
+
+**What's NOT protected:** The underlying `drip_stream` contract stores the stream amount in **cleartext**. Anyone who reads that contract's ledger entries directly can still see the real amount. Privacy is scoped to verifiers who only receive a share code, not to on-chain observers of the streaming contract.
+
+**Why this scope:** `drip_stream` was intentionally left unmodified so the streaming escrow stays backward-compatible and independently auditable. `drip_zk_verifier` is a purely **additive** layer on top — it adds the commitment + proof machinery without touching the working, tested escrow. This is a deliberate trade-off: a smaller, safer change surface now, with a clear upgrade path later.
+
+| Adversary | Amount disclosure |
+|---|---|
+| Third-party verifier with only a share code | **Protected** ✓ |
+| On-chain observer reading `drip_stream` ledger entries | **Not protected** ✗ |
+| Verifier colluding with someone who reads the stream contract | **Not protected** ✗ |
+
+**Roadmap — Confidential streaming:** the next milestone moves the commitment into the streaming contract itself and stores the amount as an encrypted value, so the cleartext never hits the ledger. That requires a redesigned `drip_stream` and is tracked as future work — see [Limitations](#limitations--honest-notes).
+
+---
+
+## Why ZK (and not a signed attestation)?
+
+A simpler design would have the payer sign a message — *"I pay this receiver ≥ X XLM/month"* — and hand it over. That breaks down fast. ZK is necessary, not decorative:
+
+- **Receiver-driven thresholds.** The receiver picks the threshold at proving time. With signed attestations, every new threshold (or every verifier asking for a different bar) means going back to the payer for a fresh signature. With ZK, one commitment supports unlimited thresholds the receiver chooses themselves.
+- **Multi-verifier without sharing the salt.** From a single registered commitment the receiver can generate many independent proofs for many verifiers — none of which reveal the salt or the amount. A signature would have to be reissued per verifier and would leak the exact figure.
+- **Payer-availability decoupling.** The receiver can prove their income at any time, even if the payer is offline, unreachable, or no longer cooperative. A signed-attestation scheme makes the payer a permanent online dependency.
+
+See [EXTENSIBILITY.md](EXTENSIBILITY.md) for other proofs the same circuit supports.
+
+---
+
 ## Deployed Contracts (Stellar Testnet)
 
 | Contract | ID | Explorer |
