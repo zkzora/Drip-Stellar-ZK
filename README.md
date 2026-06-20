@@ -282,16 +282,35 @@ cd .. && npm install && npm run dev
 
 ---
 
+## Benchmarks
+
+Measured (not estimated) contract sizes, on-chain resource fees, and proving time are in [BENCHMARKS.md](BENCHMARKS.md). Headline: deployed WASM is 11.2 KiB (`drip_stream`) + 29.3 KiB (`drip_zk_verifier`); the third-party verification a verifier runs is **free** (read-only simulation, no transaction submitted); the one-time `register_commitment` setup is ~$0.69 at current XLM price.
+
+---
+
 ## Limitations & Honest Notes
+
+These split into two kinds, and the distinction matters: scope limitations are *temporary* and clear with engineering; the privacy-model limitation is *architectural* and needs a contract redesign, not just more work.
+
+### Current scope (solvable with engineering)
 
 | Item | Status |
 |---|---|
-| Token | **XLM only** — other Stellar assets on roadmap |
-| Stream amount privacy | The `drip_stream` contract stores the cleartext amount (it was intentionally not modified). Drip Private adds the ZK commitment/proof layer on top. Full end-to-end confidentiality would require a streaming contract that never stores the cleartext amount — noted as a future improvement. |
-| Toolchain pinning | Proofs only verify with **Noir 1.0.0-beta.9 + Barretenberg 0.87.0 + keccak transcript**. Documented in [`DRIP_PRIVATE.md`](DRIP_PRIVATE.md). |
-| Browser proving speed | bb.js runs single-threaded without cross-origin isolation. Proving takes ~5–10s. Works correctly; COOP/COEP headers would speed it up. |
+| Token | **XLM only** — other Stellar assets are SAC-compatible and on the roadmap |
 | Deployment | **Testnet only** — mainnet pending security review |
+| Browser proving speed | bb.js runs single-threaded without cross-origin isolation (~5–10s). Correct as-is; COOP/COEP headers enable multithreading and cut this substantially |
+| Toolchain pinning | Proofs only verify with **Noir 1.0.0-beta.9 + Barretenberg 0.87.0 + keccak transcript**. Documented in [`DRIP_PRIVATE.md`](DRIP_PRIVATE.md) |
 | PDF export | Stub — shows "coming soon" toast |
+
+None of these change the security model. They are roadmap and ergonomics.
+
+### Privacy model (architectural — needs a redesign)
+
+| Item | Status |
+|---|---|
+| Cleartext amount in stream contract | The `drip_stream` contract stores the stream amount in cleartext. Drip Private layers a ZK commitment/proof on top, so the amount is hidden from a verifier holding only a share code — but **not** from anyone reading the stream contract's ledger entries directly. See [Privacy Model & Threat Analysis](#privacy-model--threat-analysis). |
+
+This is the one limitation you cannot engineer away within the current architecture. Closing it means **Confidential streaming**: a redesigned `drip_stream` that moves the commitment in-contract and never persists the cleartext amount. It is the headline item on the roadmap, called out deliberately rather than buried — selective disclosure is real and useful today, and full confidentiality is the next milestone, not a claim we make now.
 
 ---
 
