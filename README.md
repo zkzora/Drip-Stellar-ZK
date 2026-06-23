@@ -62,6 +62,24 @@ Drip Private provides **selective disclosure**, not full on-chain confidentialit
 
 **Roadmap — Confidential streaming:** the next milestone moves the commitment into the streaming contract itself and stores the amount as an encrypted value, so the cleartext never hits the ledger. That requires a redesigned `drip_stream` and is tracked as future work — see [Limitations](#limitations--honest-notes).
 
+### Proof Validity & Self-Dealing
+
+A separate axis from amount privacy: even with a perfectly private proof, *what does a passing proof actually entitle a lender to believe?* A receiver can stream to a second wallet they also control, prove "income," borrow against it, then cancel the stream — income that never really existed. We close the parts that are checkable on-chain and are blunt about the part that isn't.
+
+**Liveness (implemented).** `verify_income_proof` performs a cross-contract read of the referenced stream and returns `true` only when the stream is **currently `Active` and not past its `end_time`**. A `Paused` stream is treated as *not live* (no funds are vesting), and so are `Cancelled` / `Completed` streams. Because `/verify` re-runs this read-only check on demand, a proof for a stream that is cancelled or expires *after* a loan **stops verifying on re-check** — closing the "prove income, take the loan, then cancel" attack. It is a single cross-contract read: no new cryptography, the circuit and proof format are untouched, and `verify_income_proof` stays read-only (a lender still pays $0 via `simulateTransaction`).
+
+**Minimum duration (implemented, opt-in).** The verifier exposes admin-only `set_min_remaining_duration(secs)`. When set, a proof verifies only if the stream still has at least that much runway (`end_time − now ≥ min`), forcing a self-dealer to **lock real funds for real time** (recommended production value: 30 days) instead of spinning up and cancelling a stream within a block. It ships **disabled (`0`)** by default so existing short prototype streams still verify; operators opt in. Enforced purely in contract logic — the ZK circuit is not touched.
+
+**Payer independence (known limitation — NOT claimed solved).** The protocol **cannot** prove cryptographically that the payer and receiver are different people. One individual can control unlimited addresses, so "someone is paying me" and "I am paying myself" are indistinguishable on a permissionless chain. This is an **open problem for every on-chain income proof** in a permissionless setting, and it is deliberately out of scope for v1. Liveness and minimum-duration raise the *cost* of self-dealing (you must lock real capital for real time); they do not make it impossible. Stated plainly: a passing proof attests *"a live stream pays this receiver ≥ threshold right now"* — **not** *"this receiver has independent, third-party income."*
+
+| Adversary | Mitigated? | How |
+|---|---|---|
+| "Prove income, take loan, then cancel" | **Mitigated** ✓ | Liveness re-check — a cancelled/expired stream stops verifying |
+| Instant self-deal with a throwaway short stream | **Mitigated / cost raised** ✓ | Minimum-duration gate forces funds locked for a real window (opt-in) |
+| Sustained self-dealing (payer = receiver, funds genuinely locked for the full term) | **Not fully mitigated** ✗ | Documented limitation — neutralised economically (not cryptographically) via the collateral-lock [Roadmap](#roadmap) |
+
+The residual case — someone willing to lock real capital in a real stream to themselves for the full term — is addressed by economics, not cryptography: see **collateral-lock lending** in the [Roadmap](#roadmap).
+
 ---
 
 ## Why ZK (and not a signed attestation)?
@@ -230,7 +248,9 @@ components/streams/
 |---|---|
 | `initialize(admin, drip_stream, vk)` | One-time setup. Validates and stores the 1760-byte VK. |
 | `register_commitment(caller, stream_id, commitment)` | Payer-only. Cross-contract read confirms `caller` is the stream's payer, then stores the 32-byte Pedersen commitment. |
-| `verify_income_proof(stream_id, threshold, proof) → bool` | Read-only. Verifies a 14592-byte UltraHonk proof against `[commitment, threshold]`. Returns `true` iff valid. |
+| `verify_income_proof(stream_id, threshold, proof) → bool` | Read-only. Returns `true` iff the 14592-byte UltraHonk proof is valid against `[commitment, threshold]` **and** a cross-contract read confirms the stream is still live (`Active`, unexpired, and — if configured — above the minimum remaining duration). See [Proof Validity & Self-Dealing](#proof-validity--self-dealing). |
+| `set_min_remaining_duration(secs)` | Admin-only. Minimum remaining stream runway (seconds) a proof must have to verify. `0` = disabled (default). |
+| `min_remaining_duration() → u64` | Returns the configured minimum (`0` = disabled). |
 | `get_commitment(stream_id) → BytesN<32>` | Returns the registered commitment. |
 | `has_commitment(stream_id) → bool` | Whether a commitment exists (drives the UI badge). |
 | `vk_bytes() → Bytes` | Returns the stored VK for auditability. |
@@ -243,9 +263,11 @@ components/streams/
 # Soroban contracts
 cd stellar
 cargo test --package drip-stream        # 14/14 passing
-cargo test --package drip-zk-verifier   # 11/11 passing
+cargo test --package drip-zk-verifier   # 17/17 passing
                                         # includes test_verify_income_proof_valid:
-                                        # a real 14592-byte proof through the host BN254 path
+                                        # a real 14592-byte proof through the host BN254 path,
+                                        # plus liveness tests (cancelled / expired / paused
+                                        # streams stop verifying) and the opt-in min-duration gate
 
 # Noir circuit
 cd drip_proof
@@ -311,6 +333,21 @@ None of these change the security model. They are roadmap and ergonomics.
 | Cleartext amount in stream contract | The `drip_stream` contract stores the stream amount in cleartext. Drip Private layers a ZK commitment/proof on top, so the amount is hidden from a verifier holding only a share code — but **not** from anyone reading the stream contract's ledger entries directly. See [Privacy Model & Threat Analysis](#privacy-model--threat-analysis). |
 
 This is the one limitation you cannot engineer away within the current architecture. Closing it means **Confidential streaming**: a redesigned `drip_stream` that moves the commitment in-contract and never persists the cleartext amount. It is the headline item on the roadmap, called out deliberately rather than buried — selective disclosure is real and useful today, and full confidentiality is the next milestone, not a claim we make now.
+
+---
+
+## Roadmap
+
+Three milestones, each closing a specific gap rather than adding polish:
+
+1. **Confidential streaming** — move the amount commitment into `drip_stream` and store the amount encrypted, so the cleartext never hits the ledger. Closes the [privacy-model limitation](#privacy-model--threat-analysis). Headline item; requires a `drip_stream` redesign.
+
+Two further milestones specifically strengthen the [proof-validity model](#proof-validity--self-dealing):
+
+2. **Collateral-lock for lending.** When a proof is used to collateralize a loan, the underlying stream is *pledged* to the lender, giving them recourse on default. This makes self-dealing economically pointless: a borrower paying themselves is, in effect, borrowing against their own locked capital — defaulting just forfeits it to the lender. It neutralises the payer-independence problem through **incentives, not cryptography** — the correct tool for a problem cryptography provably cannot solve on a permissionless chain.
+3. **Time-weighted aggregate income proofs.** Prove that *total* income exceeded a threshold over a period (e.g. ≥ N months) and/or across several streams at once, without revealing the number of sources or how the total is composed. Far more meaningful to a lender than a single-instant snapshot, and it raises the forgery cost (faking it needs both real time and real capital). Requires the stream contract to retain temporal data and a **new circuit**, so it is planned for **v2**.
+
+Liveness and minimum-duration handle the on-chain-checkable self-dealing cases **today**; collateral-lock and time-weighted proofs handle the residual economic case **next** — neither touches the ZK circuit's amount privacy.
 
 ---
 
