@@ -369,7 +369,7 @@ export const DOCS_PAGES: DocPage[] = [
       {
         type: "reference",
         title: "Verifier contract API",
-        intro: "Deployed at CCUOR6VPMCFDOU7MODZGOI2K264YR3LNRSQ4LMJ37LGTZCTOAHSXWNV5 on Stellar Testnet.",
+        intro: "Deployed at CCA72XDP4H35AWSNP6KLLJNFDUAS7TIH24MS4FWCDYPEXG27QUVZT3W3 on Stellar Testnet.",
         items: [
           { label: "register_commitment", meta: "payer", body: "Stores the Pedersen commitment for a stream. Verifies caller is the stream payer via cross-contract read." },
           { label: "verify_income_proof", meta: "read-only", body: "Verifies a 14592-byte UltraHonk proof against the registered commitment and threshold. Returns true or false." },

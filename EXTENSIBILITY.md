@@ -46,3 +46,16 @@ Any scenario that reduces to *"prove a committed private number clears a public 
 | Browser proving (Noir.js + bb.js) | What the commitment is bound to |
 
 The circuit is the asset. Income proof is the first product built on it; the rest are a documentation away, not a redeployment away.
+
+---
+
+## Where the model evolves next (Roadmap)
+
+The circuit proves a statement about a *committed number*. Whether that statement should still be **trusted today** is enforced one layer up, in the verifier contract — `verify_income_proof` adds a read-only liveness check (the stream must still be `Active` and unexpired) and an opt-in minimum-duration gate, **without touching the circuit or proof format**. See [Proof Validity & Self-Dealing](README.md#proof-validity--self-dealing).
+
+Two roadmap directions extend the primitive itself, and the split is intentional — one is a contract/incentive change, the other is a new circuit:
+
+- **Collateral-lock for lending** — pledge the underlying stream when a proof collateralizes a loan, so self-dealing becomes economically pointless (you'd be borrowing against your own locked capital). Neutralises payer-independence through incentives, not cryptography. *No circuit change.*
+- **Time-weighted aggregate income proofs** — prove *total* income over a period and/or across several streams above a threshold, hiding the number of sources and the composition. A more meaningful claim for lenders, and a higher forgery cost. *Needs temporal data in the stream contract and a new circuit (v2).*
+
+Both are tracked in the main [Roadmap](README.md#roadmap). The v1 primitive — "a committed private number clears a public bar" — stays exactly as documented above; these build on top of it rather than replacing it.

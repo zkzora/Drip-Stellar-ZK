@@ -18,7 +18,7 @@ All numbers below are **measured**, not estimated. Method and caveats are stated
 | Contract | Size | |
 |---|---|---|
 | `drip_stream` | **11,469 bytes** | 11.2 KiB |
-| `drip_zk_verifier` | **30,011 bytes** | 29.3 KiB |
+| `drip_zk_verifier` | **26,950 bytes** | 26.3 KiB |
 
 The verifier is ~2.6× the streaming contract — expected, since it vendors the UltraHonk/BN254 verification logic. Both are comfortably under Soroban's contract size limits.
 
@@ -36,6 +36,8 @@ Fees are the simulated **resource fee** + the 100-stroop base inclusion fee. 1 X
 | `verify_income_proof` | 22,558,088 | 2.256 | ~$0.49 | **No — runs as a read-only simulation (see below)** |
 
 Measured against testnet stream **#11** (the first stream found with a registered commitment) for `verify_income_proof` and `withdraw`; a fresh Friendbot-funded account for `create_stream`; and a real stream payer for `register_commitment`.
+
+> Note: `verify_income_proof` was measured on the pre-liveness verifier. The shipped version adds one read-only cross-contract `get_stream` read (the liveness gate), a small increment on top of the figure above. It remains a read-only simulation in the app, so the real-world cost to a verifier is still **$0**.
 
 ---
 

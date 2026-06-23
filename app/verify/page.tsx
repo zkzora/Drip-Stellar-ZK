@@ -232,6 +232,15 @@ export default function VerifyPage() {
                 <span className="font-num">{stroopsToXlm(decoded.thresholdStroops)} XLM</span> — proven on-chain.
               </p>
             </div>
+            {/* Live-state semantics — this check reflects the stream right now, not forever. */}
+            <div className="rounded-xl border border-emerald-400/15 bg-emerald-400/[0.04] px-4 py-3 text-[12px] text-emerald-200/70 leading-relaxed flex items-start gap-2">
+              <Icon name="activity" size={12} className="text-emerald-300/70 shrink-0 mt-0.5" />
+              <span>
+                Verified against the <span className="text-emerald-200/90">current live state</span> of the stream —
+                not a permanent snapshot. Re-verify anytime: a cancelled, paused, or expired stream will no longer
+                verify.
+              </span>
+            </div>
             <div className="rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3 text-[12px] text-white/50 leading-relaxed">
               <Icon name="lock" size={12} className="inline text-violet-300/70 mr-1.5 -mt-0.5" />
               The receiver's actual income was never revealed. Only the threshold claim was checked against the
@@ -267,9 +276,20 @@ export default function VerifyPage() {
               </span>
             </div>
 
-            <button onClick={reset} className="text-[12.5px] text-white/45 hover:text-white/80 flex items-center gap-1.5 mx-auto transition">
-              <Icon name="arrow-left" size={13} /> Verify another
-            </button>
+            {/* Re-verify re-runs the same read-only check; a stream cancelled or
+                expired since the last check will now resolve to "Not Verified". */}
+            <div className="flex items-center justify-center gap-4 pt-1">
+              <button
+                onClick={runVerify}
+                disabled={busy}
+                className="rounded-full px-4 py-2 text-[12.5px] font-medium flex items-center gap-1.5 border border-emerald-400/30 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/25 transition disabled:opacity-50"
+              >
+                <Icon name="refresh-cw" size={13} /> Re-verify
+              </button>
+              <button onClick={reset} className="text-[12.5px] text-white/45 hover:text-white/80 flex items-center gap-1.5 transition">
+                <Icon name="arrow-left" size={13} /> Verify another
+              </button>
+            </div>
           </div>
         )}
 
@@ -307,6 +327,11 @@ export default function VerifyPage() {
             <li className="flex gap-3">
               <span className="font-mono text-violet-300/60 shrink-0">03</span>
               This page checks the proof against the stream's on-chain commitment via Stellar's BN254 host functions.
+            </li>
+            <li className="flex gap-3">
+              <span className="font-mono text-violet-300/60 shrink-0">04</span>
+              The same call also re-reads the stream live — it only passes while the stream is still active and
+              unexpired, so a cancelled stream stops verifying.
             </li>
           </ol>
         </div>
