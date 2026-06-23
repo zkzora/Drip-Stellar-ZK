@@ -16,7 +16,7 @@
 
 use soroban_sdk::{
     contract, contractimpl,
-    testutils::Address as _,
+    testutils::{Address as _, Ledger},
     Address, Bytes, BytesN, Env,
 };
 
@@ -52,6 +52,36 @@ impl MockStream {
             start_time: 0,
             end_time: 1000,
             status: StreamStatus::Active,
+            created_at: 0,
+            updated_at: 0,
+            pause_started_at: 0,
+            total_paused_secs: 0,
+        };
+        env.storage().persistent().set(&stream_id, &rec);
+    }
+
+    /// Like `seed`, but lets a test control the fields the liveness gate reads
+    /// (`status`, `end_time`). Used to exercise cancelled / paused / expired /
+    /// short-remaining streams without changing the original `seed` helper.
+    pub fn seed_full(
+        env: Env,
+        stream_id: u64,
+        payer: Address,
+        receiver: Address,
+        token: Address,
+        status: StreamStatus,
+        end_time: u64,
+    ) {
+        let rec = StreamRecord {
+            stream_id,
+            token,
+            payer,
+            receiver,
+            amount: 5000,
+            withdrawn: 0,
+            start_time: 0,
+            end_time,
+            status,
             created_at: 0,
             updated_at: 0,
             pause_started_at: 0,
@@ -258,4 +288,157 @@ fn test_verify_negative_threshold_errors() {
     let proof = Bytes::from_slice(&h.env, PROOF);
     let res = h.client.try_verify_income_proof(&7, &-1_i128, &proof);
     assert_eq!(res, Err(Ok(Error::InvalidThreshold)));
+}
+
+// ── verify_income_proof: liveness gate (Part 1c) ────────────────────────────────
+//
+// Every test below registers the *real* COMMITMENT and verifies the *real*
+// PROOF at threshold 1000, so the proof math always succeeds. The only variable
+// is the live stream state — which isolates the liveness gate that
+// `verify_income_proof` now enforces via a cross-contract `get_stream` read.
+
+/// Active, in-window stream + valid proof → verifies. Regression guard for the
+/// happy path now that verification also reads live stream state.
+#[test]
+fn test_verify_active_stream_passes_liveness() {
+    let h = setup();
+    let payer = Address::generate(&h.env);
+    let receiver = Address::generate(&h.env);
+    let token = Address::generate(&h.env);
+    let mock = MockStreamClient::new(&h.env, &h.mock_stream);
+    // Active, ends far in the future relative to the default ledger time (0).
+    mock.seed_full(&7, &payer, &receiver, &token, &StreamStatus::Active, &1_000_000);
+
+    let commitment = BytesN::from_array(&h.env, &COMMITMENT);
+    h.client.register_commitment(&payer, &7, &commitment);
+
+    let proof = Bytes::from_slice(&h.env, PROOF);
+    assert!(
+        h.client.verify_income_proof(&7, &1000_i128, &proof),
+        "active, in-window stream with a valid proof must verify"
+    );
+}
+
+/// Cancelled stream → a still-valid proof must NOT verify.
+/// This is the core "prove income, take loan, then cancel" attack being closed.
+#[test]
+fn test_verify_cancelled_stream_fails() {
+    let h = setup();
+    let payer = Address::generate(&h.env);
+    let receiver = Address::generate(&h.env);
+    let token = Address::generate(&h.env);
+    let mock = MockStreamClient::new(&h.env, &h.mock_stream);
+    mock.seed_full(&7, &payer, &receiver, &token, &StreamStatus::Cancelled, &1_000_000);
+
+    let commitment = BytesN::from_array(&h.env, &COMMITMENT);
+    h.client.register_commitment(&payer, &7, &commitment);
+
+    let proof = Bytes::from_slice(&h.env, PROOF);
+    assert!(
+        !h.client.verify_income_proof(&7, &1000_i128, &proof),
+        "cancelled stream must not verify even with a valid proof"
+    );
+}
+
+/// Expired stream (ledger time advanced past `end_time`) → must NOT verify.
+#[test]
+fn test_verify_expired_stream_fails() {
+    let h = setup();
+    let payer = Address::generate(&h.env);
+    let receiver = Address::generate(&h.env);
+    let token = Address::generate(&h.env);
+    let mock = MockStreamClient::new(&h.env, &h.mock_stream);
+    // Active, but ends at t = 1000.
+    mock.seed_full(&7, &payer, &receiver, &token, &StreamStatus::Active, &1000);
+
+    let commitment = BytesN::from_array(&h.env, &COMMITMENT);
+    h.client.register_commitment(&payer, &7, &commitment);
+
+    // Advance the ledger clock past the stream's end_time.
+    h.env.ledger().with_mut(|l| l.timestamp = 2000);
+
+    let proof = Bytes::from_slice(&h.env, PROOF);
+    assert!(
+        !h.client.verify_income_proof(&7, &1000_i128, &proof),
+        "expired stream must not verify"
+    );
+}
+
+/// Paused stream → not live by policy (income is not currently flowing).
+#[test]
+fn test_verify_paused_stream_fails() {
+    let h = setup();
+    let payer = Address::generate(&h.env);
+    let receiver = Address::generate(&h.env);
+    let token = Address::generate(&h.env);
+    let mock = MockStreamClient::new(&h.env, &h.mock_stream);
+    mock.seed_full(&7, &payer, &receiver, &token, &StreamStatus::Paused, &1_000_000);
+
+    let commitment = BytesN::from_array(&h.env, &COMMITMENT);
+    h.client.register_commitment(&payer, &7, &commitment);
+
+    let proof = Bytes::from_slice(&h.env, PROOF);
+    assert!(
+        !h.client.verify_income_proof(&7, &1000_i128, &proof),
+        "paused stream must not verify (Paused = not live by policy)"
+    );
+}
+
+// ── verify_income_proof: minimum remaining duration (Part 2, opt-in) ─────────────
+
+/// With a minimum-duration requirement configured, an Active stream whose
+/// remaining runway is below the threshold must NOT verify — even with a valid
+/// proof. Raises the cost of an instant "spin up, prove, cancel" self-deal.
+#[test]
+fn test_verify_below_min_duration_fails() {
+    let h = setup();
+    // Require 30 days of remaining runway.
+    h.client
+        .set_min_remaining_duration(&crate::RECOMMENDED_MIN_REMAINING_SECS);
+
+    let payer = Address::generate(&h.env);
+    let receiver = Address::generate(&h.env);
+    let token = Address::generate(&h.env);
+    let mock = MockStreamClient::new(&h.env, &h.mock_stream);
+    // Active, but ends in 1000 s — far below the 30-day minimum.
+    mock.seed_full(&7, &payer, &receiver, &token, &StreamStatus::Active, &1000);
+
+    let commitment = BytesN::from_array(&h.env, &COMMITMENT);
+    h.client.register_commitment(&payer, &7, &commitment);
+
+    let proof = Bytes::from_slice(&h.env, PROOF);
+    assert!(
+        !h.client.verify_income_proof(&7, &1000_i128, &proof),
+        "stream below the configured minimum remaining duration must not verify"
+    );
+}
+
+/// A stream comfortably above the configured minimum still verifies, and the
+/// minimum defaults to disabled (0) so existing behaviour is unchanged.
+#[test]
+fn test_verify_meets_min_duration_ok() {
+    let h = setup();
+    assert_eq!(
+        h.client.min_remaining_duration(),
+        0,
+        "minimum remaining duration must default to disabled"
+    );
+    h.client.set_min_remaining_duration(&100_u64);
+    assert_eq!(h.client.min_remaining_duration(), 100);
+
+    let payer = Address::generate(&h.env);
+    let receiver = Address::generate(&h.env);
+    let token = Address::generate(&h.env);
+    let mock = MockStreamClient::new(&h.env, &h.mock_stream);
+    // Active, ends at t = 10_000 → 10_000 s remaining from t = 0, well over 100.
+    mock.seed_full(&7, &payer, &receiver, &token, &StreamStatus::Active, &10_000);
+
+    let commitment = BytesN::from_array(&h.env, &COMMITMENT);
+    h.client.register_commitment(&payer, &7, &commitment);
+
+    let proof = Bytes::from_slice(&h.env, PROOF);
+    assert!(
+        h.client.verify_income_proof(&7, &1000_i128, &proof),
+        "stream meeting the minimum remaining duration must still verify"
+    );
 }

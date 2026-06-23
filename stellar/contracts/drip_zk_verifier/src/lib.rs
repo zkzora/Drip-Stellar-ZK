@@ -45,7 +45,19 @@ pub enum DataKey {
     Vk,
     /// stream_id -> commitment (BytesN<32>, a BN254 field element).
     Commitment(u64),
+    /// Optional minimum remaining stream duration (seconds) required for a
+    /// proof to verify. 0 / unset = disabled. See `set_min_remaining_duration`.
+    MinRemainingSecs,
 }
+
+/// Recommended production value for `set_min_remaining_duration`: 30 days.
+///
+/// Deliberately NOT applied by default — the contract ships with the minimum
+/// disabled (0) so existing fixtures and short prototype streams still verify.
+/// Operators opt in by calling `set_min_remaining_duration`. Documented here so
+/// the "raise the cost of self-dealing" knob has a sane reference value.
+/// (30 days ≈ 2_592_000 s.)
+pub const RECOMMENDED_MIN_REMAINING_SECS: u64 = 30 * 24 * 60 * 60;
 
 // ── Errors ───────────────────────────────────────────────────────────────────--
 
@@ -182,9 +194,22 @@ impl DripZkVerifier {
     /// state (the commitment registered by the payer) and the caller-supplied
     /// `threshold`, then verifies the UltraHonk proof against the stored VK.
     ///
-    /// Returns `true` iff the proof is valid: the prover knows the committed
-    /// amount AND that amount is `>= threshold`. The amount itself is never
-    /// revealed.
+    /// Returns `true` iff BOTH hold:
+    ///   1. the proof is valid — the prover knows the committed amount AND that
+    ///      amount is `>= threshold` (the amount itself is never revealed), and
+    ///   2. the stream is still *live* — see [`Self::is_stream_live`].
+    ///
+    /// Condition (2) is the liveness gate. A valid proof alone is a statement
+    /// about a commitment, not about whether the stream still pays out today;
+    /// without this check a receiver could prove income, draw a loan, then
+    /// `cancel_stream` and keep re-presenting the stale-but-valid proof. By
+    /// re-reading the live stream state on every verification we make a
+    /// cancelled / expired / paused stream stop verifying.
+    ///
+    /// READ-ONLY: this function never writes contract state and submits no
+    /// transactions — the liveness gate is a single cross-contract *read*. A
+    /// lender can therefore keep running it for $0 via `simulateTransaction`,
+    /// and "re-verify" is just calling it again.
     pub fn verify_income_proof(
         env: Env,
         stream_id: u64,
@@ -204,6 +229,14 @@ impl DripZkVerifier {
             .get(&DataKey::Commitment(stream_id))
             .ok_or(Error::CommitmentNotFound)?;
 
+        // Liveness gate. Done before the (more expensive) proof verification:
+        // a dead stream can never verify regardless of proof validity. Returns
+        // `Ok(false)` — same shape a lender already handles for "not verified"
+        // — rather than an error, so the read stays simple to consume.
+        if !Self::is_stream_live(&env, stream_id) {
+            return Ok(false);
+        }
+
         let vk: Bytes = env
             .storage()
             .instance()
@@ -214,6 +247,36 @@ impl DripZkVerifier {
 
         let verifier = UltraHonkVerifier::new(&env, &vk).map_err(map_vk_err)?;
         Ok(verifier.verify(&env, &proof, &public_inputs).is_ok())
+    }
+
+    /// Configure the minimum remaining stream duration (in seconds) that
+    /// `verify_income_proof` requires. `0` disables the check (the default).
+    ///
+    /// Setting e.g. [`RECOMMENDED_MIN_REMAINING_SECS`] (30 days) forces every
+    /// income claim to be backed by a stream that still has real runway left,
+    /// so a "spin up a stream, prove, immediately cancel" self-deal has to lock
+    /// funds for a meaningful window instead of a single block. This is a
+    /// purely economic knob enforced in contract logic — the ZK circuit is
+    /// untouched. Admin-only.
+    pub fn set_min_remaining_duration(env: Env, secs: u64) -> Result<(), Error> {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .ok_or(Error::NotInitialized)?;
+        admin.require_auth();
+        env.storage()
+            .instance()
+            .set(&DataKey::MinRemainingSecs, &secs);
+        Ok(())
+    }
+
+    /// Read the configured minimum remaining duration (seconds). 0 = disabled.
+    pub fn min_remaining_duration(env: Env) -> u64 {
+        env.storage()
+            .instance()
+            .get(&DataKey::MinRemainingSecs)
+            .unwrap_or(0)
     }
 
     /// Read the commitment registered for a stream.
@@ -249,6 +312,69 @@ impl DripZkVerifier {
 }
 
 // ── Internal helpers ───────────────────────────────────────────────────────────
+
+impl DripZkVerifier {
+    /// Read the live stream record from `drip_stream` and decide whether it
+    /// still backs an income claim *right now*. One read-only cross-contract
+    /// `get_stream` call; no extra cryptography, writes nothing.
+    ///
+    /// Liveness policy (explicit — mirrored in README "Proof Validity &
+    /// Self-Dealing"):
+    ///   • `Active`                  → live.
+    ///   • `Paused`                  → NOT live. A paused stream is not vesting,
+    ///                                 so the income is not currently flowing;
+    ///                                 we deliberately reject rather than treat
+    ///                                 "temporarily stopped" as "earning".
+    ///   • `Cancelled` / `Completed` → NOT live.
+    ///   • Past `end_time`           → NOT live (expired). `end_time == 0` is
+    ///                                 the stream contract's "no fixed end"
+    ///                                 sentinel (funds vest immediately, never
+    ///                                 expire) and counts as live.
+    ///   • Below configured minimum remaining duration → NOT live (opt-in,
+    ///     default disabled; see `set_min_remaining_duration`).
+    fn is_stream_live(env: &Env, stream_id: u64) -> bool {
+        let drip_stream: Address = match env.storage().instance().get(&DataKey::StreamContract) {
+            Some(addr) => addr,
+            None => return false,
+        };
+
+        // Cross-contract read of the canonical stream state.
+        let stream: StreamRecord = env.invoke_contract(
+            &drip_stream,
+            &Symbol::new(env, "get_stream"),
+            vec![env, stream_id.into_val(env)],
+        );
+
+        // Only an actively-streaming position counts. Paused is intentionally
+        // rejected (see policy above).
+        if stream.status != StreamStatus::Active {
+            return false;
+        }
+
+        let now = env.ledger().timestamp();
+
+        // Expiry: only meaningful when an end_time is set (0 == perpetual).
+        if stream.end_time != 0 && stream.end_time <= now {
+            return false;
+        }
+
+        // Optional minimum-remaining-duration gate (opt-in). Perpetual streams
+        // (end_time == 0) have unbounded runway and always satisfy it.
+        let min_remaining: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::MinRemainingSecs)
+            .unwrap_or(0);
+        if min_remaining > 0 && stream.end_time != 0 {
+            let remaining = stream.end_time.saturating_sub(now);
+            if remaining < min_remaining {
+                return false;
+            }
+        }
+
+        true
+    }
+}
 
 fn map_vk_err(e: VkLoadError) -> Error {
     match e {
