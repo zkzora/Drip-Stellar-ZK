@@ -4,7 +4,7 @@
 
 ![Stellar](https://img.shields.io/badge/stellar-testnet%20live-7D4CDB?style=flat-square)
 ![Stream Tests](https://img.shields.io/badge/stream%20tests-14%2F14%20passing-brightgreen?style=flat-square)
-![ZK Tests](https://img.shields.io/badge/ZK%20verifier%20tests-11%2F11%20passing-brightgreen?style=flat-square)
+![ZK Tests](https://img.shields.io/badge/ZK%20verifier%20tests-17%2F17%20passing-brightgreen?style=flat-square)
 ![Circuit Tests](https://img.shields.io/badge/Noir%20circuit%20tests-3%2F3%20passing-brightgreen?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square)
 
@@ -99,12 +99,12 @@ See the [Comparison table](#comparison) for how this stacks up against the alter
 | Contract | ID | Explorer |
 |---|---|---|
 | `drip_stream` | `CBY5243GMCIED3ODKDQPOXU4HDYEQMOJGXGHNBQ2E6B5MJ43Q2UXVLRV` | [View](https://stellar.expert/explorer/testnet/contract/CBY5243GMCIED3ODKDQPOXU4HDYEQMOJGXGHNBQ2E6B5MJ43Q2UXVLRV) |
-| `drip_zk_verifier` | `CCUOR6VPMCFDOU7MODZGOI2K264YR3LNRSQ4LMJ37LGTZCTOAHSXWNV5` | [View](https://stellar.expert/explorer/testnet/contract/CCUOR6VPMCFDOU7MODZGOI2K264YR3LNRSQ4LMJ37LGTZCTOAHSXWNV5) |
+| `drip_zk_verifier` | `CCA72XDP4H35AWSNP6KLLJNFDUAS7TIH24MS4FWCDYPEXG27QUVZT3W3` | [View](https://stellar.expert/explorer/testnet/contract/CCA72XDP4H35AWSNP6KLLJNFDUAS7TIH24MS4FWCDYPEXG27QUVZT3W3) |
 
-Deploy transactions:
-- WASM upload: `38dcf86ea39033001879832490dd46a61143e60438e65c95d80c9bd6c31037e8`
-- Contract create: `9f959fb07855ac526e1cfe3593602abee9681c507c7f1adc99d66e4fce43f557`
-- Initialize: `feb8394549a9b8a48fa2647a97f13426cbc39a696568d4c9a51e4f0a2e753403`
+Deploy transactions (`drip_zk_verifier`, with liveness gate):
+- WASM upload: `e59a6543e84fee19eb16be9789b13f531c12c1465aa7bd1d98ba3cc9d84b1cdd`
+- Contract create: `920a100043412a151bc436ed9efc4cc5f5addd34a46f7dfb88cd083e52e4d1ab`
+- Initialize: `a5dfaea2fd27e8bef5e4b4a97db69808925dae3a6751b8ac4e26d83ff204e1e2`
 
 ---
 
@@ -125,7 +125,7 @@ NEXT_PUBLIC_APP_CHAIN=stellar
 NEXT_PUBLIC_STELLAR_CONTRACT_ID=CBY5243GMCIED3ODKDQPOXU4HDYEQMOJGXGHNBQ2E6B5MJ43Q2UXVLRV
 NEXT_PUBLIC_STELLAR_RPC_URL=https://soroban-testnet.stellar.org
 NEXT_PUBLIC_STELLAR_NETWORK=testnet
-NEXT_PUBLIC_STELLAR_ZK_CONTRACT_ID=CCUOR6VPMCFDOU7MODZGOI2K264YR3LNRSQ4LMJ37LGTZCTOAHSXWNV5
+NEXT_PUBLIC_STELLAR_ZK_CONTRACT_ID=CCA72XDP4H35AWSNP6KLLJNFDUAS7TIH24MS4FWCDYPEXG27QUVZT3W3
 ```
 
 ---
