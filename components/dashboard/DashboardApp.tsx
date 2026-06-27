@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { Icon } from "@/components/ui/Icon";
+import { XlmGlyph } from "@/components/ui/XlmGlyph";
 import { DashboardBackground } from "@/components/ui/backgrounds";
 import { IS_STELLAR_MODE } from "@/lib/app-config";
 
@@ -790,14 +791,14 @@ function DashboardPage({ streams, onNewStream, onGoTo, walletConnected, walletEr
               <div className="mt-5 flex items-center flex-wrap gap-2">
                 <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-400/10 text-emerald-300 text-[12.5px] font-mono">
                   <Icon name="arrow-down-left" size={12} />
-                  + {IS_STELLAR_MODE ? "✦" : "◎"}{(inSum).toFixed(6)} / sec <span className="text-emerald-300/60 ml-1">incoming</span>
+                  + {IS_STELLAR_MODE ? <XlmGlyph size={12} /> : "◎"}{(inSum).toFixed(6)} / sec <span className="text-emerald-300/60 ml-1">incoming</span>
                 </span>
                 <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-400/10 text-rose-300 text-[12.5px] font-mono">
                   <Icon name="arrow-up-right" size={12} />
-                  - {IS_STELLAR_MODE ? "✦" : "◎"}{(outSum).toFixed(6)} / sec <span className="text-rose-300/60 ml-1">outgoing</span>
+                  - {IS_STELLAR_MODE ? <XlmGlyph size={12} /> : "◎"}{(outSum).toFixed(6)} / sec <span className="text-rose-300/60 ml-1">outgoing</span>
                 </span>
                 <span className={`px-3 py-1.5 rounded-full text-[12.5px] font-mono border ${positive ? "border-emerald-400/30 text-emerald-300" : "border-rose-400/30 text-rose-300"}`}>
-                  Net: {positive ? "+" : ""}{net.toFixed(6)} {IS_STELLAR_MODE ? "XLM" : "SOL"}/sec ~{positive ? "+" : ""}{IS_STELLAR_MODE ? "✦" : "◎"}{(net * 86400).toFixed(4)}/day
+                  Net: {positive ? "+" : ""}{net.toFixed(6)} {IS_STELLAR_MODE ? "XLM" : "SOL"}/sec ~{positive ? "+" : ""}{IS_STELLAR_MODE ? <XlmGlyph size={11} /> : "◎"}{(net * 86400).toFixed(4)}/day
                 </span>
               </div>
             </div>
@@ -814,7 +815,7 @@ function DashboardPage({ streams, onNewStream, onGoTo, walletConnected, walletEr
         <SummaryTile
           icon="layers"
           label="Total value streamed"
-          value={`${IS_STELLAR_MODE ? "✦" : "◎"}${fmtUSD(totalStreamed, 4)}`}
+          value={<>{IS_STELLAR_MODE ? <XlmGlyph size={22} className="mr-0.5" /> : "◎"}{fmtUSD(totalStreamed, 4)}</>}
           sub={`lifetime · ${IS_STELLAR_MODE ? "testnet" : "devnet"} demo data`}
           accent
         />

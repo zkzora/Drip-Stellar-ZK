@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
+import { XlmGlyph } from "@/components/ui/XlmGlyph";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { MinimalGridBackground } from "@/components/ui/backgrounds";
 import {
@@ -565,10 +566,10 @@ export default function CompliancePage({ stellarAddress, stellarStreams }: { ste
             </>
           ) : (
             <>
-              <SummaryMetric icon="arrow-up-right" label="Total streamed (out)" value={`${IS_STELLAR_MODE ? "✦" : "◎"}${fmtSol4(totals.out)}`} sub={`${filtered.filter((r: any) => r.type === "out").length} outgoing streams`} tone="down" />
-              <SummaryMetric icon="arrow-down-left" label="Total received (in)"  value={`${IS_STELLAR_MODE ? "✦" : "◎"}${fmtSol4(totals.in)}`}  sub={`${filtered.filter((r: any) => r.type === "in").length} incoming streams`}  tone="up" />
-              <SummaryMetric icon="scale"           label="Net position"         value={`${totals.net >= 0 ? "+" : "-"}${IS_STELLAR_MODE ? "✦" : "◎"}${fmtSol4(Math.abs(totals.net))}`} sub="received - streamed" tone={totals.net >= 0 ? "up" : "down"} />
-              <SummaryMetric icon="landmark"        label="Estimated tax"        value={`${IS_STELLAR_MODE ? "✦" : "◎"}${fmtSol4(totals.tax)}`} sub="10% flat - indicative only" tone="accent" emphasize />
+              <SummaryMetric icon="arrow-up-right" label="Total streamed (out)" value={<>{IS_STELLAR_MODE ? <XlmGlyph /> : "◎"}{fmtSol4(totals.out)}</>} sub={`${filtered.filter((r: any) => r.type === "out").length} outgoing streams`} tone="down" />
+              <SummaryMetric icon="arrow-down-left" label="Total received (in)"  value={<>{IS_STELLAR_MODE ? <XlmGlyph /> : "◎"}{fmtSol4(totals.in)}</>}  sub={`${filtered.filter((r: any) => r.type === "in").length} incoming streams`}  tone="up" />
+              <SummaryMetric icon="scale"           label="Net position"         value={<>{totals.net >= 0 ? "+" : "-"}{IS_STELLAR_MODE ? <XlmGlyph /> : "◎"}{fmtSol4(Math.abs(totals.net))}</>} sub="received - streamed" tone={totals.net >= 0 ? "up" : "down"} />
+              <SummaryMetric icon="landmark"        label="Estimated tax"        value={<>{IS_STELLAR_MODE ? <XlmGlyph /> : "◎"}{fmtSol4(totals.tax)}</>} sub="10% flat - indicative only" tone="accent" emphasize />
             </>
           )}
         </div>
@@ -908,7 +909,7 @@ function LedgerRow({ row }: any) {
             <span className="text-[12.5px] text-white truncate">{row.counterparty}</span>
           </div>
           <span className={`font-num text-[13px] shrink-0 ${isIn ? "text-emerald-300" : "text-white"}`}>
-            {isIn ? "+" : "−"}{IS_STELLAR_MODE ? "✦" : "◎"}{fmtSol4(row.amount)}
+            {isIn ? "+" : "−"}{IS_STELLAR_MODE ? <XlmGlyph size={12} /> : "◎"}{fmtSol4(row.amount)}
           </span>
         </div>
         <div className="flex items-center justify-between text-[11px] font-mono text-white/45">
@@ -943,7 +944,7 @@ function LedgerRow({ row }: any) {
         </div>
         <div className="col-span-1 text-right font-mono text-white/65">{fmtDur(row.duration)}</div>
         <div className="col-span-2 text-right">
-          <span className={`font-num text-[14px] ${isIn ? "text-emerald-300" : "text-white"}`}>{isIn ? "+" : "-"}{IS_STELLAR_MODE ? "✦" : "◎"}{fmtSol4(row.amount)}</span>
+          <span className={`font-num text-[14px] ${isIn ? "text-emerald-300" : "text-white"}`}>{isIn ? "+" : "-"}{IS_STELLAR_MODE ? <XlmGlyph size={13} /> : "◎"}{fmtSol4(row.amount)}</span>
         </div>
         <div className="col-span-2 text-right">
           <a href="#" className="inline-flex items-center gap-1 font-mono text-[11px] text-violet-300/80 hover:text-white">
