@@ -387,11 +387,6 @@ function StellarDashboard({ walletConnected, onConnectWallet, onNewStream, onGoT
   const cancelledCount = trackedStreams.filter(s => s.onChainState?.status === "Cancelled" || s.onChainState?.status === "Completed").length;
   const loadingCount   = trackedStreams.filter(s => s.isLoading).length;
 
-  const contractConfigured = !!(
-    process.env.NEXT_PUBLIC_STELLAR_CONTRACT_ID &&
-    process.env.NEXT_PUBLIC_STELLAR_CONTRACT_ID !== "REPLACE_WITH_STELLAR_TESTNET_CONTRACT_ID"
-  );
-
   // Live protocol counter for the connect screen — XLM streamed through Drip,
   // ticking up per second so the hero feels alive (vanity/testnet aggregate).
   const liveStreamed = useStreamingValue(248917.482, 0.4137, true);
@@ -459,8 +454,8 @@ function StellarDashboard({ walletConnected, onConnectWallet, onNewStream, onGoT
                   </div>
                 </div>
 
-                {/* Right — live protocol stat + network info */}
-                <div className="lg:col-span-5 space-y-4">
+                {/* Right — live protocol stat */}
+                <div className="lg:col-span-5">
 
                   {/* Hero stat — total XLM streamed, live-ticking */}
                   <div className="relative overflow-hidden rounded-2xl border border-violet-400/20 bg-gradient-to-br from-violet-500/[0.08] via-[#0b0a1a] to-sky-400/[0.05] p-5 sm:p-6">
@@ -486,35 +481,6 @@ function StellarDashboard({ walletConnected, onConnectWallet, onNewStream, onGoT
                     <div className="mt-2.5 flex items-center gap-1.5 text-[11px] font-mono text-white/35">
                       <Icon name="trending-up" size={12} className="text-emerald-300/70" />
                       flowing through Drip · Stellar Testnet
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-5">
-                    <div className="text-[10px] uppercase tracking-[0.22em] text-white/30 font-mono mb-4">Network info</div>
-                    <div className="space-y-3">
-                      {[
-                        { k: "Network",    v: "Stellar Testnet",               cls: "text-sky-300"     },
-                        { k: "Asset",      v: "Native XLM",                    cls: "text-white/65"    },
-                        { k: "Contract",   v: contractConfigured ? "Configured ✓" : "Not configured",
-                                           cls: contractConfigured ? "text-emerald-300" : "text-amber-300" },
-                        { k: "Signer",     v: "Freighter extension",            cls: "text-white/55"    },
-                        { k: "Mode",       v: "Testnet only · no real funds",   cls: "text-white/40"    },
-                      ].map(({ k, v, cls }) => (
-                        <div key={k} className="flex items-start justify-between gap-4">
-                          <span className="text-[11.5px] text-white/30 font-mono shrink-0 pt-0.5">{k}</span>
-                          <span className={`text-[12px] font-mono text-right ${cls}`}>{v}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-5 pt-4 border-t border-white/5">
-                      <a
-                        href="https://laboratory.stellar.org/#account-creator?network=test"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full btn-ghost rounded-xl py-2 text-[12px] text-sky-300/70 hover:text-sky-200 flex items-center justify-center gap-1.5 transition"
-                      >
-                        <Icon name="zap" size={12} /> Get free testnet XLM
-                      </a>
                     </div>
                   </div>
                 </div>
