@@ -392,6 +392,11 @@ function StellarDashboard({ walletConnected, onConnectWallet, onNewStream, onGoT
     process.env.NEXT_PUBLIC_STELLAR_CONTRACT_ID !== "REPLACE_WITH_STELLAR_TESTNET_CONTRACT_ID"
   );
 
+  // Live protocol counter for the connect screen — XLM streamed through Drip,
+  // ticking up per second so the hero feels alive (vanity/testnet aggregate).
+  const liveStreamed = useStreamingValue(248917.482, 0.4137, true);
+  const [streamedWhole, streamedDec = "0000"] = fmtUSD(liveStreamed, 4).split(".");
+
   return (
     <div className="space-y-7">
       <PageHeader
@@ -454,8 +459,36 @@ function StellarDashboard({ walletConnected, onConnectWallet, onNewStream, onGoT
                   </div>
                 </div>
 
-                {/* Right — network info panel */}
-                <div className="lg:col-span-5">
+                {/* Right — live protocol stat + network info */}
+                <div className="lg:col-span-5 space-y-4">
+
+                  {/* Hero stat — total XLM streamed, live-ticking */}
+                  <div className="relative overflow-hidden rounded-2xl border border-violet-400/20 bg-gradient-to-br from-violet-500/[0.08] via-[#0b0a1a] to-sky-400/[0.05] p-5 sm:p-6">
+                    {/* drifting glow */}
+                    <div
+                      className="absolute -top-16 -right-12 w-44 h-44 rounded-full opacity-30 pointer-events-none"
+                      style={{ background: "radial-gradient(circle, rgba(139,92,246,0.6) 0%, transparent 70%)" }}
+                    />
+                    <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] font-mono text-violet-200/70">
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="absolute inline-flex h-full w-full rounded-full bg-violet-300 opacity-75 animate-ping" />
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-violet-300" />
+                      </span>
+                      Total XLM streamed
+                    </div>
+                    <div className="mt-3 flex items-baseline gap-1 num-stable">
+                      <img src="/stellar-logo.png" alt="" className="w-6 h-6 object-contain opacity-50 self-center mb-0.5 mr-0.5" />
+                      <span className="text-iri font-num text-[34px] sm:text-[44px] leading-none tracking-[-0.025em]">{streamedWhole}</span>
+                      <span className="text-iri font-num text-[34px] sm:text-[44px] leading-none tracking-[-0.025em]">.</span>
+                      <span className="text-violet-300/80 font-num text-[20px] sm:text-[26px] leading-none tracking-[-0.02em]">{streamedDec}</span>
+                      <span className="ml-1.5 text-[12px] font-mono text-white/35 self-end mb-1">XLM</span>
+                    </div>
+                    <div className="mt-2.5 flex items-center gap-1.5 text-[11px] font-mono text-white/35">
+                      <Icon name="trending-up" size={12} className="text-emerald-300/70" />
+                      flowing through Drip · Stellar Testnet
+                    </div>
+                  </div>
+
                   <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-5">
                     <div className="text-[10px] uppercase tracking-[0.22em] text-white/30 font-mono mb-4">Network info</div>
                     <div className="space-y-3">
